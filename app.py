@@ -34,7 +34,7 @@ df = (
 # Set up page and branding
 # st.logo("srn-icon.png", link="https://sustainabilityreportingnavigator.com")
 st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-icon.png")
-st.title("SRN CSRD Report Archive")
+# st.title("SRN CSRD Report Archive")
 
 col1c, col2c = st.columns((0.6, 0.4))
 with col1c:
