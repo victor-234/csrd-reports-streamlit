@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 st.logo("srn-icon.png", link="https://sustainabilityreportingnavigator.com")
+st.set_page_config(layout="wide")
 st.title("SRN CSRD Report Archive")
 st.markdown("""
             Welcome to the Sustainability Reporting Navigator's CSRD report archive!
@@ -34,18 +35,26 @@ df = (
         'SASB industry \n(SICS® Industries)': "Industry",
         "publication date": "Published",
         "link": "URL",
+        "pages PDF": "Pages",
+        "auditor": "Auditor",
     })
     .merge(industry_lookup)
-    .loc[:, ['Company', 'Country', 'Sector', "Published", 'URL']]
+    .loc[:, ['Company', 'Country', 'Sector', 'Industry', "Published", 'URL', "Pages", "Auditor"]]
     .dropna()
     .sort_values("Published", ascending=True)
 )
 
-country_options = ["All"] + sorted(df["Country"].unique())
-industry_options = ["All"] + sorted(df["Sector"].unique())
 
-selected_countries = st.multiselect("Select Countries", options=country_options, default=["All"])
-selected_industries = st.multiselect("Select Sector", options=industry_options, default=["All"])
+col1, col2 = st.columns(2)
+
+with col1:
+    country_options = ["All"] + sorted(df["Country"].unique())
+    selected_countries = st.multiselect("Select Countries", options=country_options, default=["All"])
+
+
+with col2:
+    industry_options = ["All"] + sorted(df["Sector"].unique())
+    selected_industries = st.multiselect("Select Sector", options=industry_options, default=["All"])
 
 
 if "All" in selected_countries:
@@ -63,6 +72,7 @@ filtered_df = df[
     df["Sector"].isin(filtered_industries)
 ]
 
+
 st.dataframe(
     filtered_df.style.format(lambda x: "Link to report" if type(x) == str and x.startswith("https") else x),
     column_config={
@@ -72,9 +82,17 @@ st.dataframe(
         "Published": st.column_config.DateColumn(format="DD.MM.YYYY", width="small")
     },
     hide_index=True,
-    use_container_width=True
+    use_container_width=True,
+    height=35*len(filtered_df)+38
 )
 
 st.divider()
-st.image("logo.png", width=300)
-st.markdown(":gray[The platform is part of the Collaborative Research Center TRR 266 [Accounting for Transparency](https://accounting-for-transparency.de). For questions and feedback, [feel free to reach out](mailto:victor.wagner@lmu.de,maximilian.mueller@wiso.uni-koeln.de)]")
+col1a, col2a = st.columns(spec=(0.3, 0.7))
+with col1a:
+    st.image("logo.png", width=300)
+with col2a:
+    st.markdown("""
+                :gray[The platform is part of the Collaborative Research Center TRR 266 [Accounting for Transparency](https://accounting-for-transparency.de).]
+
+                :gray[For questions and feedback, [feel free to reach out](mailto:victor.wagner@lmu.de,maximilian.mueller@wiso.uni-koeln.de)]
+                """)
