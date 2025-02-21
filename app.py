@@ -150,4 +150,4 @@ st.dataframe(
 
 st.divider()
 st.image("logo.png", width=300)
-st.markdown(":gray[The platform is part of the Collaborative Research Center TRR 266 [Accounting for Transparency](https://accounting-for-transparency.de).]")
+st.markdown(":gray[The platform is part of the Collaborative Research Center TRR 266 [Accounting for Transparency](https://accounting-for-transparency.de). For questions and feedback, [feel free to reach out](mailto:victor.wagner@lmu.de,maximilian.mueller@wiso.uni-koeln.de)]")
