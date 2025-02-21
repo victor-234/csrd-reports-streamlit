@@ -25,71 +25,75 @@ st.divider()
 csrd_url = "https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=0"
 
 # Load data from the Google Sheet CSV exports
-df = pd.read_csv(csrd_url, skiprows=1)
+df = pd.read_csv(csrd_url, skiprows=2)
 industry_lookup = pd.read_csv("https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=218767986#gid=218767986")
 
 # Prepare the CSRD DataFrame
-df = (
-    df
-    .query("verified == 'yes'")
-    .rename(columns={
-        "company": "Company",
-        "country": "Country",
-        'SASB industry \n(SICS® Industries)': "Industry",
-        "publication date": "Published",
-        "link": "URL",
-        "pages PDF": "Pages",
-        "auditor": "Auditor",
-    })
-    .merge(industry_lookup.rename(columns={
-        "SICS® Industries": "Industry",
-        "SICS® Sector": "Sector"
-    }), on="Industry", how="left")
-    .loc[:, ['Company', 'Country', 'Sector', 'Industry', "Published", 'URL', "Pages", "Auditor"]]
-    .dropna()
-    .sort_values("Published", ascending=True)
-)
+try:
+    df = (
+        df
+        .query("verified == 'yes'")
+        .rename(columns={
+            "company": "Company",
+            "country": "Country",
+            'SASB industry \n(SICS® Industries)': "Industry",
+            "publication date": "Published",
+            "link": "URL",
+            "pages PDF": "Pages",
+            "auditor": "Auditor",
+        })
+        .merge(industry_lookup.rename(columns={
+            "SICS® Industries": "Industry",
+            "SICS® Sector": "Sector"
+        }), on="Industry", how="left")
+        .loc[:, ['Company', 'Country', 'Sector', 'Industry', "Published", 'URL', "Pages", "Auditor"]]
+        .dropna()
+        .sort_values("Published", ascending=True)
+    )
 
-# Create filters in two columns
-col1, col2 = st.columns(2)
+    # Create filters in two columns
+    col1, col2 = st.columns(2)
 
-with col1:
-    country_options = ["All"] + sorted(df["Country"].unique())
-    selected_countries = st.multiselect("Select Countries", options=country_options, default=["All"])
+    with col1:
+        country_options = ["All"] + sorted(df["Country"].unique())
+        selected_countries = st.multiselect("Select Countries", options=country_options, default=["All"])
 
-with col2:
-    industry_options = ["All"] + sorted(df["Sector"].unique())
-    selected_industries = st.multiselect("Select Sector", options=industry_options, default=["All"])
+    with col2:
+        industry_options = ["All"] + sorted(df["Sector"].unique())
+        selected_industries = st.multiselect("Select Sector", options=industry_options, default=["All"])
 
-# Apply filtering logic
-if "All" in selected_countries:
-    filtered_countries = df["Country"].unique()
-else:
-    filtered_countries = selected_countries
+    # Apply filtering logic
+    if "All" in selected_countries:
+        filtered_countries = df["Country"].unique()
+    else:
+        filtered_countries = selected_countries
 
-if "All" in selected_industries:
-    filtered_industries = df["Sector"].unique()
-else:
-    filtered_industries = selected_industries
+    if "All" in selected_industries:
+        filtered_industries = df["Sector"].unique()
+    else:
+        filtered_industries = selected_industries
 
-filtered_df = df[
-    df["Country"].isin(filtered_countries) &
-    df["Sector"].isin(filtered_industries)
-]
+    filtered_df = df[
+        df["Country"].isin(filtered_countries) &
+        df["Sector"].isin(filtered_industries)
+    ]
 
-# Display the filtered table with custom formatting and column configurations
-st.dataframe(
-    filtered_df.style.format(lambda x: "Link to report" if isinstance(x, str) and x.startswith("https") else x),
-    column_config={
-        "Company": st.column_config.Column(width="medium"),
-        "URL": st.column_config.LinkColumn(),
-        "Sector": st.column_config.Column(width="medium"),
-        "Published": st.column_config.DateColumn(format="DD.MM.YYYY", width="small")
-    },
-    hide_index=True,
-    use_container_width=True,
-    height=35 * len(filtered_df) + 38
-)
+    # Display the filtered table with custom formatting and column configurations
+    st.dataframe(
+        filtered_df.style.format(lambda x: "Link to report" if isinstance(x, str) and x.startswith("https") else x),
+        column_config={
+            "Company": st.column_config.Column(width="medium"),
+            "URL": st.column_config.LinkColumn(),
+            "Sector": st.column_config.Column(width="medium"),
+            "Published": st.column_config.DateColumn(format="DD.MM.YYYY", width="small")
+        },
+        hide_index=True,
+        use_container_width=True,
+        height=35 * len(filtered_df) + 38
+    )
+
+except:
+    st.error('This is an error. We are working on a fix. In the meantime, check out our Google Sheet!', icon="🚨")
 
 st.divider()
 col1a, col2a = st.columns(spec=(0.3, 0.7))
