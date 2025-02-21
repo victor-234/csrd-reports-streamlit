@@ -32,17 +32,15 @@ df = (
 )
 
 # Set up page and branding
-st.logo("srn-icon.png", link="https://sustainabilityreportingnavigator.com")
+# st.logo("srn-icon.png", link="https://sustainabilityreportingnavigator.com")
 st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-icon.png")
 st.title("SRN CSRD Report Archive")
 
 col1c, col2c = st.columns((0.6, 0.4))
 with col1c:
     st.markdown(f"""
-                **Welcome to the Sustainability Reporting Navigator's CSRD report archive!**
+                We are crowd-sourcing the collection of CSRD-compliant reports to support prepares and users of sustainability reporting.
 
-                [The SRN](https://sustainabilityreportingnavigator.com/) is an open-science platform to make sustainability reporting accessible for firms and stakeholders. The platform is part of the Collaborative Research Center TRR 266 Accounting for Transparency and jointly hosted and developed by Goethe University, University of Cologne and LMU Munich.
-                
                 Below, you find a continuously updated list of {len(df)} CSRD-compliant reports.
                 
                 Want to make an addition? Feel free to do so [using this Google Sheet](https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/edit?gid=1695573594#gid=1695573594) and [follow us on LinkedIn](https://www.linkedin.com/company/sustainability-reporting-navigator/).
@@ -131,13 +129,13 @@ try:
 except:
     st.error('This is an error. We are working on a fix. In the meantime, check out our Google Sheet!', icon="🚨")
 
-st.divider()
-col1a, col2a = st.columns(spec=(0.3, 0.7))
-with col1a:
-    st.image("logo.png", width=300)
-with col2a:
-    st.markdown("""
-                :gray[The platform is part of the Collaborative Research Center TRR 266 [Accounting for Transparency](https://accounting-for-transparency.de).]
+# st.divider()
+# col1a, col2a = st.columns(spec=(0.3, 0.7))
+# with col1a:
+#     st.image("logo.png", width=300)
+# with col2a:
+#     st.markdown("""
+#                 :gray[The platform is part of the Collaborative Research Center TRR 266 [Accounting for Transparency](https://accounting-for-transparency.de).]
 
-                :wave: :gray[For questions and feedback, [feel free to reach out](mailto:victor.wagner@lmu.de,maximilian.mueller@wiso.uni-koeln.de)!]
-                """)
+#                 :wave: :gray[For questions and feedback, [feel free to reach out](mailto:victor.wagner@lmu.de,maximilian.mueller@wiso.uni-koeln.de)!]
+#                 """)
