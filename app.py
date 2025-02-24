@@ -111,6 +111,21 @@ filtered_df = df[
     df["Sector"].isin(filtered_industries)
 ]
 
+# Next, we prepare a list of companies from this filtered DataFrame:
+company_list = sorted(filtered_df["Company"].unique())
+
+# We add a 'None' item to represent "no company selected yet".
+selected_company = st.selectbox(
+    label="Search for a company",
+    options=[None] + company_list,            # None is the first option
+    format_func=lambda x: "Search for a company..." if x is None else x,  # Display text
+    index=0                                   # Default to None selected
+)
+
+# If the user selects a company, we filter; otherwise we keep all rows.
+if selected_company is not None:
+    filtered_df = filtered_df[filtered_df["Company"] == selected_company]
+
 try:
     # Display the filtered table with custom formatting and column configurations
     st.dataframe(
