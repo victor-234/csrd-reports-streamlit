@@ -26,7 +26,8 @@ df = (
         "SICS® Industries": "Industry",
         "SICS® Sector": "Sector"
     }), on="Industry", how="left")
-    .loc[:, ['Company', 'Country', 'Sector', 'Industry', "Published", 'URL', "Pages", "Auditor"]]
+    .assign(URL = lambda x: [f"{y}#name={z}" for y, z in zip(x["URL"], x["Company"])])
+    .loc[:, ['Company', 'URL', 'Country', 'Sector', 'Industry', "Published", "Pages", "Auditor"]]
     .dropna()
     .sort_values("Published", ascending=True)
 )
@@ -89,11 +90,11 @@ col1, col2 = st.columns(2)
 
 with col1:
     country_options = ["All"] + sorted(df["Country"].unique())
-    selected_countries = st.multiselect("Select Countries", options=country_options, default=["All"])
+    selected_countries = st.multiselect("Select countries", options=country_options, default=["All"])
 
 with col2:
     industry_options = ["All"] + sorted(df["Sector"].unique())
-    selected_industries = st.multiselect("Select Sector", options=industry_options, default=["All"])
+    selected_industries = st.multiselect("Select sector", options=industry_options, default=["All"])
 
 # Apply filtering logic
 if "All" in selected_countries:
@@ -129,10 +130,14 @@ if selected_company is not None:
 try:
     # Display the filtered table with custom formatting and column configurations
     st.dataframe(
-        filtered_df.style.format(lambda x: "Link to report" if isinstance(x, str) and x.startswith("https") else x),
+        filtered_df.drop("Company", axis=1),
         column_config={
             "Company": st.column_config.Column(width="medium"),
-            "URL": st.column_config.LinkColumn(),
+            "URL": st.column_config.LinkColumn(
+                label="Company",
+                width="medium", 
+                display_text="^https://.*#name=(.*)$"
+                ),
             "Sector": st.column_config.Column(width="medium"),
             "Published": st.column_config.DateColumn(format="DD.MM.YYYY", width="small")
         },
@@ -141,8 +146,9 @@ try:
         height=35 * len(filtered_df) + 38
     )
 
-except:
+except Exception as e:
     st.error('This is an error. We are working on a fix. In the meantime, check out our Google Sheet!', icon="🚨")
+    print(e)
 
 # st.divider()
 # col1a, col2a = st.columns(spec=(0.3, 0.7))
