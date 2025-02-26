@@ -166,7 +166,7 @@ try:
         )
 
     with tab2:
-
+        st.rerun()
         col1d, _ = st.columns([0.7, 0.3])
 
         with col1d:
