@@ -170,8 +170,8 @@ try:
 
         with col1d:
             st.markdown(":gray[For this chart, we counted the number of times, the standard-identifier (e.g., 'E1' for ESRS E1: Climate change) is referenced in the company's sustainability statement.]")
-            scale_by_pages = st.checkbox("Scale the references by the length of the sustainability statement", key="scale_by_pages")
-            # scale_by_pages = st.session_state.get("scale_by_pages", False)
+            st.checkbox("Scale the references by the length of the sustainability statement", key="scale_by_pages")
+            scale_by_pages = st.session_state.get("scale_by_pages", False)
         
         filtered_melted_df = (
             filtered_df
@@ -237,7 +237,16 @@ try:
                 )
             )
 
-            st.altair_chart(heatmap + labels)
+            # Build your heatmap and labels as before…
+            combined_chart = alt.layer(heatmap, labels).properties(
+                height=len(filtered_df)*20,  # Set a fixed height
+                width=600    # Optionally set a fixed width
+            )
+
+            # Use a placeholder to ensure the chart renders even in a lazy-loaded tab
+            chart_placeholder = st.empty()
+            chart_placeholder.altair_chart(combined_chart, use_container_width=True)
+
 
 except Exception as e:
     st.error('This is an error. We are working on a fix. In the meantime, check out our Google Sheet!', icon="🚨")
