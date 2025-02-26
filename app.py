@@ -224,22 +224,22 @@ try:
             
             predicate = alt.datum.hits > filtered_melted_df['hits'].max()/2
 
-            # labels = (
-            #     alt.Chart(filtered_melted_df)
-            #     .mark_text(
-            #         fontSize=12,
-            #         fontWeight="lighter",
-            #     )
-            #     .encode(
-            #         x="standard",
-            #         y="company",
-            #         color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
-            #         text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
-            #         tooltip = alt.value(None),
-            #     )
-            # )
+            labels = (
+                alt.Chart(filtered_melted_df)
+                .mark_text(
+                    fontSize=12,
+                    fontWeight="lighter",
+                )
+                .encode(
+                    x="standard",
+                    y="company",
+                    color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
+                    text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
+                    tooltip = alt.value(None),
+                )
+            )
 
-            st.altair_chart(heatmap)
+            st.altair_chart(alt.layer(heatmap, labels))
 
 
 except Exception as e:
