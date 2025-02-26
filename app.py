@@ -34,6 +34,7 @@ df = (
                 company = lambda x: x["company"].str.strip()
                 )
             .query("year == 2024")
+            .drop("pages", axis=1)
             .drop_duplicates(subset=['company'])
         ),
         on=["company"], how="outer", indicator=True
@@ -175,21 +176,21 @@ try:
 
         with col1d:
             st.markdown(":gray[For this chart, we counted the number of times, the standard-identifier (e.g., 'E1' for ESRS E1: Climate change) is referenced in the company's sustainability statement.]")
-            st.checkbox("Scale the references by the length of the sustainability statement", key="scale_by_pages")
-            scale_by_pages = st.session_state.get("scale_by_pages", False)
+            scale_by_pages = st.checkbox("Scale the references by the length of the sustainability statement", key="scale_by_pages")
+            # scale_by_pages = st.session_state.get("scale_by_pages", False)
         
         filtered_melted_df = (
             filtered_df
-            .loc[:, ['company', "pages", "esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]]
-            .melt(id_vars=["company", "pages"], value_name="hits", var_name="standard")
+            .loc[:, ['company', "pages PDF", "esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]]
+            .melt(id_vars=["company", "pages PDF"], value_name="hits", var_name="standard")
             .assign(
                 standard = lambda x: x["standard"].str.upper(),
-                hits=lambda x: x["hits"].fillna(0) / x["pages"] if scale_by_pages else x["hits"].fillna(0)  # Scale if checked
+                hits=lambda x: x["hits"] / x["pages PDF"] if scale_by_pages else x["hits"]  # Scale if checked
                 )
             .dropna()
         )
 
-        if len(filtered_melted_df.dropna()) == 0:
+        if filtered_melted_df.empty:
             st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
 
         else:
@@ -216,7 +217,7 @@ try:
                     tooltip = [
                         alt.Tooltip("company",  title="Company"),
                         alt.Tooltip("standard",  title="ESRS topic"),
-                        alt.Tooltip("pages",  title="Pages"),
+                        alt.Tooltip("pages PDF",  title="Pages"),
                         alt.Tooltip("hits",  title="Referenced" if not scale_by_pages else "References / pages")
                         ]
                 )
