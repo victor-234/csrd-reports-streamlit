@@ -191,7 +191,7 @@ try:
 
         else:
             # Add a radio button for scaling method
-            scaling_method = st.radio("Select scaling method", ("Overall", "Within-Firm"))
+            scaling_method = st.radio("Select scaling method (Within-firm: colors show variation within one firm; Overall: colors show comparison across all displayed firms)", ("Within-firm", "Overall"), index=0)
 
             if scaling_method == "Within-Firm":
                 # Compute normalized hits per company (0 to 1 for each firm)
