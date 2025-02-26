@@ -177,7 +177,7 @@ try:
 
         filtered_melted_df = (
             filtered_df
-            .loc[:, ['company', "pages PDF", "esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]]
+            .loc[:, ['company', "pages PDF", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]]
             .melt(id_vars=["company", "pages PDF"], value_name="hits", var_name="standard")
             .assign(
                 standard = lambda x: x["standard"].str.upper(),
@@ -190,56 +190,74 @@ try:
             st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
 
         else:
+            # Add a radio button for scaling method
+            scaling_method = st.radio("Select scaling method", ("Overall", "Within-Firm"))
+
+            if scaling_method == "Within-Firm":
+                # Compute normalized hits per company (0 to 1 for each firm)
+                filtered_melted_df["norm_hits"] = (
+                    filtered_melted_df.groupby("company")["hits"]
+                    .transform(lambda x: x / x.max() if x.max() != 0 else 0)
+                )
+                color_field = "norm_hits:Q"
+                color_scale = alt.Scale(
+                    domain=[0, 0.5, 1],
+                    range=['#ffffff', '#a0a0ff', '#4200ff']
+                )
+            else:
+                # Use overall hits
+                color_field = "hits:Q"
+                overall_max = filtered_melted_df["hits"].max()
+                color_scale = alt.Scale(
+                    domain=[0, overall_max/2, overall_max],
+                    range=['#ffffff', '#a0a0ff', '#4200ff']
+                )
+
+            # Create the heatmap using the chosen scaling method
             heatmap = (
                 alt.Chart(filtered_melted_df)
                 .mark_rect(stroke="lightgray", filled=True)
                 .encode(
-                    x = alt.X(
+                    x=alt.X(
                         "standard", 
                         title=None, 
                         axis=alt.Axis(orient="top"),
-                        sort=["esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]
-                        ),
-                    y = alt.Y("company", title=None),
-                    color = alt.Color(
-                        "hits", 
+                        sort=["esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]
+                    ),
+                    y=alt.Y("company", title=None),
+                    color=alt.Color(
+                        color_field, 
                         title="Referenced", 
-                        scale=alt.Scale(
-                            domain=[0, filtered_melted_df['hits'].max()/2, filtered_melted_df['hits'].max()], 
-                            range=['#ffffff', '#a0a0ff', '#4200ff']
-                            ),
-                        # legend=alt.Legend(orient="none", legendX=520, legendY=-60, tickCount=1, direction="horizontal")
-                        ),
-                    tooltip = [
-                        alt.Tooltip("company",  title="Company"),
-                        alt.Tooltip("standard",  title="ESRS topic"),
-                        alt.Tooltip("pages PDF",  title="Pages"),
-                        alt.Tooltip("hits",  title="Referenced" if not scale_by_pages else "References / pages")
-                        ]
+                        scale=color_scale
+                    ),
+                    tooltip=[
+                        alt.Tooltip("company", title="Company"),
+                        alt.Tooltip("standard", title="ESRS topic"),
+                        alt.Tooltip("hits", title="Referenced")
+                    ]
                 )
-                # .properties(
-                #     width='container',
-                # )
             )
-            
+
+                     
             predicate = alt.datum.hits > filtered_melted_df['hits'].max()/2
 
-            labels = (
-                alt.Chart(filtered_melted_df)
-                .mark_text(
-                    fontSize=12,
-                    fontWeight="lighter",
-                )
-                .encode(
-                    x="standard:O",
-                    y="company:O",
-                    color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
-                    text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
-                    tooltip = alt.value(None),
-                )
-            )
+            # labels = (
+            #     alt.Chart(filtered_melted_df)
+            #     .mark_text(
+            #         fontSize=12,
+            #         fontWeight="lighter",
+            #     )
+            #     .encode(
+            #         x="standard:O",
+            #         y="company:O",
+            #         color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
+            #         text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
+            #         tooltip = alt.value(None),
+            #     )
+            # )
 
-            st.altair_chart(alt.layer(heatmap, labels))
+            st.altair_chart(heatmap)
+
 
 
 except Exception as e:
@@ -253,7 +271,7 @@ except Exception as e:
 #     st.image("logo.png", width=300)
 # with col2a:
 st.markdown("""
-            :gray[20250226-12:20am]
+            :gray[20250226-12:43am]
             """)
 
 
