@@ -49,7 +49,7 @@ st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-
 # st.title("SRN CSRD Report Archive")
 
 st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True) 
-st.markdown(" <style>iframe{ height: 300px !important } ", unsafe_allow_html=True)
+st.markdown(""" <style>iframe{ height: 500px !important } """, unsafe_allow_html=True)
 
 col1c, col2c = st.columns((0.6, 0.4))
 with col1c:
@@ -185,8 +185,6 @@ try:
                 )
             .dropna()
         )
-
-        print(filtered_melted_df)
 
         if filtered_melted_df.empty:
             st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
