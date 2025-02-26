@@ -177,7 +177,7 @@ try:
 
         filtered_melted_df = (
             filtered_df
-            .loc[:, ['company', "pages PDF", "esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]]
+            .loc[:, ['company', "pages PDF", "esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]]
             .melt(id_vars=["company", "pages PDF"], value_name="hits", var_name="standard")
             .assign(
                 standard = lambda x: x["standard"].str.upper(),
@@ -198,7 +198,7 @@ try:
                         "standard", 
                         title=None, 
                         axis=alt.Axis(orient="top"),
-                        sort=["esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]
+                        sort=["esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]
                         ),
                     y = alt.Y("company", title=None),
                     color = alt.Color(
@@ -231,15 +231,15 @@ try:
                     fontWeight="lighter",
                 )
                 .encode(
-                    x="standard",
-                    y="company",
+                    x="standard:O",
+                    y="company:O",
                     color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
                     text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
                     tooltip = alt.value(None),
                 )
             )
 
-            st.altair_chart(heatmap)
+            st.altair_chart(alt.layer(heatmap, labels))
 
 
 except Exception as e:
