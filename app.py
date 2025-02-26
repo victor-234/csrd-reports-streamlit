@@ -239,7 +239,7 @@ try:
                 )
             )
 
-            st.altair_chart(alt.layer(heatmap, labels))
+            st.altair_chart(heatmap)
 
 
 except Exception as e:
