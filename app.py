@@ -145,7 +145,7 @@ if selected_company is not None:
 try:
     # Display the filtered table with custom formatting and column configurations
     st.dataframe(
-        filtered_df.loc[:, ['link', 'company', 'country', 'sector', 'industry', 'publication date', 'pages PDF', 'auditor']],
+        filtered_df.loc[:, ['link', 'country', 'sector', 'industry', 'publication date', 'pages PDF', 'auditor']],
         column_config={
             # "company": st.column_config.Column(width="medium", label="Company"),
             "link": st.column_config.LinkColumn(
@@ -221,22 +221,22 @@ try:
         
         predicate = alt.datum.hits > filtered_melted_df['hits'].max()/2
 
-        labels = (
-            alt.Chart(filtered_melted_df)
-            .mark_text(
-                fontSize=12,
-                fontWeight="lighter",
-            )
-            .encode(
-                x="standard",
-                y="company",
-                color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
-                text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
-                tooltip = alt.value(None),
-            )
-        )
+        # labels = (
+        #     alt.Chart(filtered_melted_df)
+        #     .mark_text(
+        #         fontSize=12,
+        #         fontWeight="lighter",
+        #     )
+        #     .encode(
+        #         x="standard",
+        #         y="company",
+        #         color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
+        #         text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
+        #         tooltip = alt.value(None),
+        #     )
+        # )
 
-        st.altair_chart(alt.layer(heatmap, labels), use_container_width=True)
+        st.altair_chart(heatmap)
 
 
 except Exception as e:
@@ -250,7 +250,7 @@ except Exception as e:
 #     st.image("logo.png", width=300)
 # with col2a:
 st.markdown("""
-            :gray[20250226-12:06am]
+            :gray[20250226-12:20am]
             """)
 
 
