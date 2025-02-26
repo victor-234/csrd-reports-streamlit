@@ -98,53 +98,56 @@ with col2c:
 st.divider()
 
 
-
-# Create filters in two columns
-col1, col2 = st.columns(2)
-
-with col1:
-    country_options = ["All"] + sorted(df["country"].unique())
-    selected_countries = st.multiselect("Select countries", options=country_options, default=["All"])
-
-with col2:
-    industry_options = ["All"] + sorted(df["sector"].unique())
-    selected_industries = st.multiselect("Select sector", options=industry_options, default=["All"])
-
-# Apply filtering logic
-if "All" in selected_countries:
-    filtered_countries = df["country"].unique()
-else:
-    filtered_countries = selected_countries
-
-if "All" in selected_industries:
-    filtered_industries = df["sector"].unique()
-else:
-    filtered_industries = selected_industries
-
-filtered_df = df[
-    df["country"].isin(filtered_countries) &
-    df["sector"].isin(filtered_industries)
-]
-
-# Next, we prepare a list of companies from this filtered DataFrame:
-company_list = sorted(filtered_df["company"].unique())
-
-# We add a 'None' item to represent "no company selected yet".
-selected_company = st.selectbox(
-    label="Search for a company",
-    options=[None] + company_list,            # None is the first option
-    format_func=lambda x: "Search for a company..." if x is None else x,  # Display text
-    index=0                                   # Default to None selected
-)
-
-# If the user selects a company, we filter; otherwise we keep all rows.
-if selected_company is not None:
-    filtered_df = filtered_df[filtered_df["company"] == selected_company]
-
 try:
     tab1, tab2 = st.tabs(["List of reports", "Heatmap of topics reported"])
 
     with tab1:
+
+        # Create filters in two columns
+        col1, col2 = st.columns(2)
+
+        with col1:
+            country_options = ["All"] + sorted(df["country"].unique())
+            selected_countries = st.multiselect("Select countries", options=country_options, default=["All"], key="tab1_country")
+
+        with col2:
+            industry_options = ["All"] + sorted(df["sector"].unique())
+            selected_industries = st.multiselect("Select sector", options=industry_options, default=["All"], key="tab1_industry")
+
+        # Apply filtering logic
+        if "All" in selected_countries:
+            filtered_countries = df["country"].unique()
+        else:
+            filtered_countries = selected_countries
+
+        if "All" in selected_industries:
+            filtered_industries = df["sector"].unique()
+        else:
+            filtered_industries = selected_industries
+
+        filtered_df = df[
+            df["country"].isin(filtered_countries) &
+            df["sector"].isin(filtered_industries)
+        ]
+
+        # Next, we prepare a list of companies from this filtered DataFrame:
+        company_list = sorted(filtered_df["company"].unique())
+
+        # We add a 'None' item to represent "no company selected yet".
+        selected_company = st.selectbox(
+            label="Search for a company",
+            options=[None] + company_list,            # None is the first option
+            format_func=lambda x: "Search for a company..." if x is None else x,  # Display text
+            index=0,                                   # Default to None selected
+            key="tab1_selectbox"
+        )
+
+        # If the user selects a company, we filter; otherwise we keep all rows.
+        if selected_company is not None:
+            filtered_df = filtered_df[filtered_df["company"] == selected_company]
+
+        # ----
+            
         # Display the filtered table with custom formatting and column configurations
         st.dataframe(
             filtered_df.loc[:, ['link', 'company', 'country', 'sector', 'industry', 'publication date', 'pages PDF', 'auditor']],
@@ -167,6 +170,50 @@ try:
         )
 
     with tab2:
+        # Create filters in two columns
+        col1, col2 = st.columns(2)
+
+        with col1:
+            country_options = ["All"] + sorted(df["country"].unique())
+            selected_countries = st.multiselect("Select countries", options=country_options, default=["All"], key="tab2_country")
+
+        with col2:
+            industry_options = ["All"] + sorted(df["sector"].unique())
+            selected_industries = st.multiselect("Select sector", options=industry_options, default=["All"], key="tab2_industry")
+
+        # Apply filtering logic
+        if "All" in selected_countries:
+            filtered_countries = df["country"].unique()
+        else:
+            filtered_countries = selected_countries
+
+        if "All" in selected_industries:
+            filtered_industries = df["sector"].unique()
+        else:
+            filtered_industries = selected_industries
+
+        filtered_df = df[
+            df["country"].isin(filtered_countries) &
+            df["sector"].isin(filtered_industries)
+        ]
+
+        # Next, we prepare a list of companies from this filtered DataFrame:
+        company_list = sorted(filtered_df["company"].unique())
+
+        # We add a 'None' item to represent "no company selected yet".
+        selected_company = st.selectbox(
+            label="Search for a company",
+            options=[None] + company_list,            # None is the first option
+            format_func=lambda x: "Search for a company..." if x is None else x,  # Display text
+            index=0,
+            key="tab2_selectbox"
+        )
+
+        # If the user selects a company, we filter; otherwise we keep all rows.
+        if selected_company is not None:
+            filtered_df = filtered_df[filtered_df["company"] == selected_company]
+
+        # ----
         col1d, _ = st.columns([0.7, 0.3])
 
         with col1d:
@@ -238,15 +285,7 @@ try:
                 )
             )
 
-            # Build your heatmap and labels as before…
-            combined_chart = alt.layer(heatmap, labels).properties(
-                height=len(filtered_df)*20,
-                width=600
-            )
-
-            # Use a placeholder to ensure the chart renders even in a lazy-loaded tab
-            chart_placeholder = st.empty()
-            chart_placeholder.altair_chart(combined_chart, use_container_width=True)
+            st.altair_chart(alt.layer(heatmap, labels), use_container_width=True)
 
 
 except Exception as e:
