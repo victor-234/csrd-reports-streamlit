@@ -49,6 +49,7 @@ st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-
 # st.title("SRN CSRD Report Archive")
 
 st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True) 
+st.markdown("""<style> iframe[title="streamlit_echarts.st_echarts"]{ height: 1000px;} </style> """, unsafe_allow_html=True) 
 
 col1c, col2c = st.columns((0.6, 0.4))
 with col1c:
@@ -239,8 +240,8 @@ try:
 
             # Build your heatmap and labels as before…
             combined_chart = alt.layer(heatmap, labels).properties(
-                height=len(filtered_df)*20,  # Set a fixed height
-                width=600    # Optionally set a fixed width
+                height=len(filtered_df)*20,
+                width=600
             )
 
             # Use a placeholder to ensure the chart renders even in a lazy-loaded tab
