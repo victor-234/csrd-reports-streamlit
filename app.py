@@ -225,7 +225,7 @@ try:
                 # )
             )
             
-            predicate = alt.datum.hits > 50 if not scale_by_pages else alt.datum.hits > 1
+            predicate = alt.datum.hits > filtered_melted_df['hits'].max()/2
 
             labels = (
                 alt.Chart(filtered_melted_df)
