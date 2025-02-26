@@ -49,7 +49,6 @@ st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-
 # st.title("SRN CSRD Report Archive")
 
 st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True) 
-st.markdown("""<style> iframe{ height: 1000px;} </style> """, unsafe_allow_html=True) 
 
 col1c, col2c = st.columns((0.6, 0.4))
 with col1c:
@@ -241,7 +240,32 @@ try:
                 )
             )
 
+            st.markdown(
+                """
+                <style>
+                .chart-container {
+                    height: 10px;   /* Set a fixed height for the chart container */
+                    position: relative;
+                }
+                </style>
+                <div class="chart-container">
+                """,
+                unsafe_allow_html=True
+            )
             st.altair_chart(alt.layer(heatmap, labels), use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+            st.components.v1.html(
+                """
+                <script>
+                // Wait 500ms then trigger a resize event to help reflow charts in hidden tabs.
+                setTimeout(function(){
+                    window.dispatchEvent(new Event('resize'));
+                }, 500);
+                </script>
+                """,
+                height=0
+            )
 
 
 except Exception as e:
@@ -256,7 +280,7 @@ except Exception as e:
 #     st.image("logo.png", width=300)
 # with col2a:
 st.markdown("""
-            :gray[20250225-11:55]
+            :gray[20250226-12:02am]
             """)
 
 
