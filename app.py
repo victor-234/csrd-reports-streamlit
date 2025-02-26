@@ -141,102 +141,105 @@ if selected_company is not None:
 # ----
 
 
-
 try:
-    # Display the filtered table with custom formatting and column configurations
-    st.dataframe(
-        filtered_df.loc[:, ['link', 'country', 'sector', 'industry', 'publication date', 'pages PDF', 'auditor']],
-        column_config={
-            # "company": st.column_config.Column(width="medium", label="Company"),
-            "link": st.column_config.LinkColumn(
-                label="Company",
-                width="medium", 
-                display_text="^https://.*#name=(.*)$"
-                ),
-            "sector": st.column_config.Column(width="medium", label="Sector"),
-            "industry": st.column_config.Column(width="medium", label="Industry"),
-            "publication date": st.column_config.DateColumn(format="DD.MM.YYYY", width="small", label="Published"),
-            "pages PDF": st.column_config.TextColumn(help="The number of pages of the sustainability statement.", label="Pages"),
-            "auditor": st.column_config.TextColumn(label="Auditor"),
-        },
-        hide_index=True,
-        use_container_width=True,
-        height=35 * len(filtered_df) + 38
-    )
+    tab1, tab2 = st.tabs(["List of reports", "Heatmap of topics reported"])
 
-    # Create filters in two columns
-    col1d, _ = st.columns([0.7, 0.3])
-
-    with col1d:
-        st.markdown(":gray[For this chart, we counted the number of times, the standard-identifier (e.g., 'E1' for ESRS E1: Climate change) is referenced in the company's sustainability statement.]")
-        st.checkbox("Scale the references by the length of the sustainability statement", key="scale_by_pages")
-        scale_by_pages = st.session_state.get("scale_by_pages", False)
-
-    filtered_melted_df = (
-        filtered_df
-        .loc[:, ['company', "pages PDF", "esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]]
-        .melt(id_vars=["company", "pages PDF"], value_name="hits", var_name="standard")
-        .assign(
-            standard = lambda x: x["standard"].str.upper(),
-            hits=lambda x: x["hits"] / x["pages PDF"] if scale_by_pages else x["hits"]  # Scale if checked
-            )
-        .dropna()
-    )
-
-    if filtered_melted_df.empty:
-        st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
-
-    else:
-        heatmap = (
-            alt.Chart(filtered_melted_df)
-            .mark_rect(stroke="lightgray", filled=True)
-            .encode(
-                x = alt.X(
-                    "standard", 
-                    title=None, 
-                    axis=alt.Axis(orient="top"),
-                    sort=["esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]
+    with tab1:
+        # Display the filtered table with custom formatting and column configurations
+        st.dataframe(
+            filtered_df.loc[:, ['link', 'country', 'sector', 'industry', 'publication date', 'pages PDF', 'auditor']],
+            column_config={
+                # "company": st.column_config.Column(width="medium", label="Company"),
+                "link": st.column_config.LinkColumn(
+                    label="Company",
+                    width="medium", 
+                    display_text="^https://.*#name=(.*)$"
                     ),
-                y = alt.Y("company", title=None),
-                color = alt.Color(
-                    "hits", 
-                    title="Referenced", 
-                    scale=alt.Scale(
-                        domain=[0, filtered_melted_df['hits'].max()/2, filtered_melted_df['hits'].max()], 
-                        range=['#ffffff', '#a0a0ff', '#4200ff']
-                        ),
-                    # legend=alt.Legend(orient="none", legendX=520, legendY=-60, tickCount=1, direction="horizontal")
-                    ),
-                tooltip = [
-                    alt.Tooltip("company",  title="Company"),
-                    alt.Tooltip("standard",  title="ESRS topic"),
-                    alt.Tooltip("pages PDF",  title="Pages"),
-                    alt.Tooltip("hits",  title="Referenced" if not scale_by_pages else "References / pages")
-                    ]
-            )
-            # .properties(
-            #     width='container',
-            # )
+                "sector": st.column_config.Column(width="medium", label="Sector"),
+                "industry": st.column_config.Column(width="medium", label="Industry"),
+                "publication date": st.column_config.DateColumn(format="DD.MM.YYYY", width="small", label="Published"),
+                "pages PDF": st.column_config.TextColumn(help="The number of pages of the sustainability statement.", label="Pages"),
+                "auditor": st.column_config.TextColumn(label="Auditor"),
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=35 * len(filtered_df) + 38
         )
-        
-        predicate = alt.datum.hits > filtered_melted_df['hits'].max()/2
 
-        # labels = (
-        #     alt.Chart(filtered_melted_df)
-        #     .mark_text(
-        #         fontSize=12,
-        #         fontWeight="lighter",
-        #     )
-        #     .encode(
-        #         x="standard",
-        #         y="company",
-        #         color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
-        #         text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
-        #         tooltip = alt.value(None),
-        #     )
-        # )
+    with tab2:
+        # Create filters in two columns
+        col1d, _ = st.columns([0.7, 0.3])
 
-        st.altair_chart(heatmap)
+        with col1d:
+            st.markdown(":gray[For this chart, we counted the number of times, the standard-identifier (e.g., 'E1' for ESRS E1: Climate change) is referenced in the company's sustainability statement.]")
+            st.checkbox("Scale the references by the length of the sustainability statement", key="scale_by_pages")
+            scale_by_pages = st.session_state.get("scale_by_pages", False)
+
+        filtered_melted_df = (
+            filtered_df
+            .loc[:, ['company', "pages PDF", "esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]]
+            .melt(id_vars=["company", "pages PDF"], value_name="hits", var_name="standard")
+            .assign(
+                standard = lambda x: x["standard"].str.upper(),
+                hits=lambda x: x["hits"] / x["pages PDF"] if scale_by_pages else x["hits"]  # Scale if checked
+                )
+            .dropna()
+        )
+
+        if filtered_melted_df.empty:
+            st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
+
+        else:
+            heatmap = (
+                alt.Chart(filtered_melted_df)
+                .mark_rect(stroke="lightgray", filled=True)
+                .encode(
+                    x = alt.X(
+                        "standard", 
+                        title=None, 
+                        axis=alt.Axis(orient="top"),
+                        sort=["esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]
+                        ),
+                    y = alt.Y("company", title=None),
+                    color = alt.Color(
+                        "hits", 
+                        title="Referenced", 
+                        scale=alt.Scale(
+                            domain=[0, filtered_melted_df['hits'].max()/2, filtered_melted_df['hits'].max()], 
+                            range=['#ffffff', '#a0a0ff', '#4200ff']
+                            ),
+                        # legend=alt.Legend(orient="none", legendX=520, legendY=-60, tickCount=1, direction="horizontal")
+                        ),
+                    tooltip = [
+                        alt.Tooltip("company",  title="Company"),
+                        alt.Tooltip("standard",  title="ESRS topic"),
+                        alt.Tooltip("pages PDF",  title="Pages"),
+                        alt.Tooltip("hits",  title="Referenced" if not scale_by_pages else "References / pages")
+                        ]
+                )
+                # .properties(
+                #     width='container',
+                # )
+            )
+            
+            predicate = alt.datum.hits > filtered_melted_df['hits'].max()/2
+
+            # labels = (
+            #     alt.Chart(filtered_melted_df)
+            #     .mark_text(
+            #         fontSize=12,
+            #         fontWeight="lighter",
+            #     )
+            #     .encode(
+            #         x="standard",
+            #         y="company",
+            #         color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
+            #         text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
+            #         tooltip = alt.value(None),
+            #     )
+            # )
+
+            st.altair_chart(heatmap)
 
 
 except Exception as e:
