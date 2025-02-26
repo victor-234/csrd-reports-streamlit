@@ -155,6 +155,7 @@ try:
                     width="medium", 
                     display_text="^https://.*#name=(.*)$"
                     ),
+                "country": st.column_config.Column(label="Country"),
                 "sector": st.column_config.Column(width="medium", label="Sector"),
                 "industry": st.column_config.Column(width="medium", label="Industry"),
                 "publication date": st.column_config.DateColumn(format="DD.MM.YYYY", width="small", label="Published"),
