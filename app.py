@@ -190,6 +190,8 @@ try:
             .dropna()
         )
 
+        print(filtered_melted_df)
+
         if filtered_melted_df.empty:
             st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
 
