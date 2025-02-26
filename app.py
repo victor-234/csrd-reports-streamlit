@@ -1,41 +1,54 @@
 import pandas as pd
 import streamlit as st
+import altair as alt
 
-# Define CSV export URLs for each sheet
-# (Update the gid values if needed to match the correct sheet)
-csrd_url = "https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=0"
-
-# Load data from the Google Sheet CSV exports
-df = pd.read_csv(csrd_url, skiprows=2)
-industry_lookup = pd.read_csv("https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=218767986#gid=218767986")
 
 # Prepare the CSRD DataFrame
 df = (
-    df
+    pd.read_csv("https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=0", skiprows=2)
     .query("verified == 'yes'")
     .rename(columns={
-        "company": "Company",
-        "country": "Country",
-        'SASB industry \n(SICS® Industries)': "Industry",
-        "publication date": "Published",
-        "link": "URL",
-        "pages PDF": "Pages",
-        "auditor": "Auditor",
-    })
-    .merge(industry_lookup.rename(columns={
-        "SICS® Industries": "Industry",
-        "SICS® Sector": "Sector"
-    }), on="Industry", how="left")
-    .assign(URL = lambda x: [f"{y}#name={z}" for y, z in zip(x["URL"], x["Company"])])
-    .loc[:, ['Company', 'URL', 'Country', 'Sector', 'Industry', "Published", "Pages", "Auditor"]]
+        'SASB industry \n(SICS® Industries)': "industry",
+        })
+    .merge(
+        # Merge Industry-Sector Lookup from separate sheet
+        pd.read_csv(
+            "https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=218767986#gid=218767986"
+            ).rename(columns={
+                "SICS® Industries": "industry",
+                "SICS® Sector": "sector"
+                }
+            ), on="industry", how="left"
+        )
+    .assign(
+        link = lambda x: [f"{y}#name={z}" for y, z in zip(x["link"], x["company"])],
+        company = lambda x: x["company"].str.strip()
+        )
+    .loc[:, ['company', 'link', 'country', 'sector', 'industry', "publication date", "pages PDF", "auditor"]]
     .dropna()
-    .sort_values("Published", ascending=True)
+    # Merge the standard-counts dataframe
+    .merge(
+        (
+            pd.read_csv("https://docs.google.com/spreadsheets/d/1Vj8yau93kmSs_WqnV5w1V_tdU-JlMo-BV6htDvAv1TI/export?format=csv&gid=1792638779#gid=1792638779")
+            .assign(
+                company = lambda x: x["company"].str.strip()
+                )
+            .query("year == 2024")
+            .drop("pages", axis=1)
+            .drop_duplicates(subset=['company'])
+        ),
+        on=["company"], how="outer", indicator=True
+    )
+    .query("_merge != 'right_only'")
+    .sort_values("publication date", ascending=True)
 )
 
 # Set up page and branding
 # st.logo("srn-icon.png", link="https://sustainabilityreportingnavigator.com")
 st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-icon.png")
 # st.title("SRN CSRD Report Archive")
+st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True) 
+
 
 col1c, col2c = st.columns((0.6, 0.4))
 with col1c:
@@ -82,88 +95,184 @@ with col2c:
 
 
 st.divider()
-
-
-
 # Create filters in two columns
 col1, col2 = st.columns(2)
 
 with col1:
-    country_options = ["All"] + sorted(df["Country"].unique())
-    selected_countries = st.multiselect("Select countries", options=country_options, default=["All"])
+    country_options = ["All"] + sorted(df["country"].unique())
+    selected_countries = st.multiselect("Select countries", options=country_options, default=["All"], key="tab1_country")
 
 with col2:
-    industry_options = ["All"] + sorted(df["Sector"].unique())
-    selected_industries = st.multiselect("Select sector", options=industry_options, default=["All"])
+    industry_options = ["All"] + sorted(df["sector"].unique())
+    selected_industries = st.multiselect("Select sector", options=industry_options, default=["All"], key="tab1_industry")
 
 # Apply filtering logic
 if "All" in selected_countries:
-    filtered_countries = df["Country"].unique()
+    filtered_countries = df["country"].unique()
 else:
     filtered_countries = selected_countries
 
 if "All" in selected_industries:
-    filtered_industries = df["Sector"].unique()
+    filtered_industries = df["sector"].unique()
 else:
     filtered_industries = selected_industries
 
 filtered_df = df[
-    df["Country"].isin(filtered_countries) &
-    df["Sector"].isin(filtered_industries)
+    df["country"].isin(filtered_countries) &
+    df["sector"].isin(filtered_industries)
 ]
 
 # Next, we prepare a list of companies from this filtered DataFrame:
-company_list = sorted(filtered_df["Company"].unique())
+company_list = sorted(filtered_df["company"].unique())
 
 # We add a 'None' item to represent "no company selected yet".
 selected_company = st.selectbox(
     label="Search for a company",
     options=[None] + company_list,            # None is the first option
     format_func=lambda x: "Search for a company..." if x is None else x,  # Display text
-    index=0                                   # Default to None selected
+    index=0,                                   # Default to None selected
+    key="tab1_selectbox"
 )
 
 # If the user selects a company, we filter; otherwise we keep all rows.
 if selected_company is not None:
-    filtered_df = filtered_df[filtered_df["Company"] == selected_company]
+    filtered_df = filtered_df[filtered_df["company"] == selected_company]
+
+# ----
+
 
 try:
-    # Display the filtered table with custom formatting and column configurations
-    st.dataframe(
-        filtered_df.drop("Company", axis=1),
-        column_config={
-            "Company": st.column_config.Column(width="medium"),
-            "URL": st.column_config.LinkColumn(
-                label="Company",
-                width="medium", 
-                display_text="^https://.*#name=(.*)$"
-                ),
-            "Sector": st.column_config.Column(width="medium"),
-            "Published": st.column_config.DateColumn(format="DD.MM.YYYY", width="small")
-        },
-        hide_index=True,
-        use_container_width=True,
-        height=35 * len(filtered_df) + 38
-    )
+    tab1, tab2 = st.tabs(["List of reports", "Heatmap of topics reported"])
+
+    with tab1:
+        # Display the filtered table with custom formatting and column configurations
+        st.dataframe(
+            filtered_df.loc[:, ['link', 'country', 'sector', 'industry', 'publication date', 'pages PDF', 'auditor']],
+            column_config={
+                # "company": st.column_config.Column(width="medium", label="Company"),
+                "link": st.column_config.LinkColumn(
+                    label="Company",
+                    width="medium", 
+                    display_text="^https://.*#name=(.*)$"
+                    ),
+                "country": st.column_config.Column(label="Country"),
+                "sector": st.column_config.Column(width="medium", label="Sector"),
+                "industry": st.column_config.Column(width="medium", label="Industry"),
+                "publication date": st.column_config.DateColumn(format="DD.MM.YYYY", width="small", label="Published"),
+                "pages PDF": st.column_config.TextColumn(help="The number of pages of the sustainability statement.", label="Pages"),
+                "auditor": st.column_config.TextColumn(label="Auditor"),
+            },
+            hide_index=True,
+            use_container_width=True,
+            height=35 * len(filtered_df) + 38
+        )
+
+    with tab2:
+        # Create filters in two columns
+        col1d, _ = st.columns([0.7, 0.3])
+
+        with col1d:
+            st.markdown(":gray[For this chart, we counted the number of times, the standard-identifier (e.g., 'E1' for ESRS E1: Climate change) is referenced in the company's sustainability statement.]")
+            st.checkbox("Scale the references by the length of the sustainability statement", key="scale_by_pages")
+            scale_by_pages = st.session_state.get("scale_by_pages", False)
+
+        filtered_melted_df = (
+            filtered_df
+            .loc[:, ['company', "pages PDF", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]]
+            .melt(id_vars=["company", "pages PDF"], value_name="hits", var_name="standard")
+            .assign(
+                standard = lambda x: x["standard"].str.upper(),
+                hits=lambda x: x["hits"] / x["pages PDF"] if scale_by_pages else x["hits"]  # Scale if checked
+                )
+            .dropna()
+        )
+
+        if filtered_melted_df.empty:
+            st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
+
+        else:
+            # Add a radio button for scaling method
+            scaling_method = st.radio("Select scaling method (Within-firm: colors show variation within one firm; Overall: colors show comparison across all displayed firms)", ("Within-firm", "Overall"), index=0)
+
+            if scaling_method == "Within-firm":
+                # Compute normalized hits per company (0 to 1 for each firm)
+                filtered_melted_df["norm_hits"] = (
+                    filtered_melted_df.groupby("company")["hits"]
+                    .transform(lambda x: x / x.max() if x.max() != 0 else 0)
+                )
+                color_field = "norm_hits:Q"
+                color_scale = alt.Scale(
+                    domain=[0, 0.5, 1],
+                    range=['#ffffff', '#a0a0ff', '#4200ff']
+                )
+            else:
+                # Use overall hits
+                color_field = "hits:Q"
+                overall_max = filtered_melted_df["hits"].max()
+                color_scale = alt.Scale(
+                    domain=[0, overall_max/2, overall_max],
+                    range=['#ffffff', '#a0a0ff', '#4200ff']
+                )
+
+            # Create the heatmap using the chosen scaling method
+            heatmap = (
+                alt.Chart(filtered_melted_df)
+                .mark_rect(stroke="lightgray", filled=True)
+                .encode(
+                    x=alt.X(
+                        "standard", 
+                        title=None, 
+                        axis=alt.Axis(orient="top"),
+                        sort=["esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]
+                    ),
+                    y=alt.Y("company", title=None),
+                    color=alt.Color(
+                        color_field, 
+                        title="Referenced", 
+                        scale=color_scale
+                    ),
+                    tooltip=[
+                        alt.Tooltip("company", title="Company"),
+                        alt.Tooltip("standard", title="ESRS topic"),
+                        alt.Tooltip("hits", title="Referenced")
+                    ]
+                )
+            )
+
+                     
+            predicate = alt.datum.hits > filtered_melted_df['hits'].max()/2
+
+            # labels = (
+            #     alt.Chart(filtered_melted_df)
+            #     .mark_text(
+            #         fontSize=12,
+            #         fontWeight="lighter",
+            #     )
+            #     .encode(
+            #         x="standard:O",
+            #         y="company:O",
+            #         color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
+            #         text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
+            #         tooltip = alt.value(None),
+            #     )
+            # )
+
+            st.altair_chart(heatmap)
+
+
 
 except Exception as e:
     st.error('This is an error. We are working on a fix. In the meantime, check out our Google Sheet!', icon="🚨")
     print(e)
+
 
 # st.divider()
 # col1a, col2a = st.columns(spec=(0.3, 0.7))
 # with col1a:
 #     st.image("logo.png", width=300)
 # with col2a:
-#     st.markdown("""
-#                 :gray[The platform is part of the Collaborative Research Center TRR 266 [Accounting for Transparency](https://accounting-for-transparency.de).]
+st.markdown("""
+            :gray[20250226-12:43am]
+            """)
 
-#                 :wave: :gray[For questions and feedback, [feel free to reach out](mailto:victor.wagner@lmu.de,maximilian.mueller@wiso.uni-koeln.de)!]
-#                 """)
 
-hide_streamlit_style = """
-            <style>
-            footer {visibility: hidden;}
-            </style>
-            """
-st.markdown(hide_streamlit_style, unsafe_allow_html=True) 
