@@ -49,7 +49,7 @@ st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-
 # st.title("SRN CSRD Report Archive")
 
 st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True) 
-st.markdown("""<style> iframe[title="streamlit_echarts.st_echarts"]{ height: 1000px;} </style> """, unsafe_allow_html=True) 
+st.markdown("""<style> iframe{ height: 1000px;} </style> """, unsafe_allow_html=True) 
 
 col1c, col2c = st.columns((0.6, 0.4))
 with col1c:
@@ -299,10 +299,8 @@ except Exception as e:
 # with col1a:
 #     st.image("logo.png", width=300)
 # with col2a:
-#     st.markdown("""
-#                 :gray[The platform is part of the Collaborative Research Center TRR 266 [Accounting for Transparency](https://accounting-for-transparency.de).]
-
-#                 :wave: :gray[For questions and feedback, [feel free to reach out](mailto:victor.wagner@lmu.de,maximilian.mueller@wiso.uni-koeln.de)!]
-#                 """)
+st.markdown("""
+            :gray[20250225-11:51]
+            """)
 
 
