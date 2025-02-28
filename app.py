@@ -3,6 +3,21 @@ import streamlit as st
 import altair as alt
 
 
+# ------------------------------------ SETUP ------------------------------------
+
+# Set up page and branding
+st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-icon.png")
+st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True)
+
+standard_info_mapper = pd.DataFrame({
+    'standard': ['e1', 'e2', 'e3', 'e4', 'e5', 's1', 's2', 's3', 's4', 'g1'],
+    'standard2': ['E1 Climate', 'E2 Pollution', 'E3 Water', 'E4 Biodiv', 'E5 Circular', 'S1 Workforce', 'S2 Value chain', 'S3 Communities', 'S4 Consumers', 'G1 Conduct'],
+    'standardgroup': ['E', 'E', 'E', 'E', 'E', 'S', 'S', 'S', 'S', 'G'],
+    'ig3_dp': [217, 72, 51, 125, 67, 198, 71, 69, 69, 55]
+})
+
+
+# ------------------------------------ PREPARE DF -------------------------------
 # Prepare the CSRD DataFrame
 df = (
     pd.read_csv("https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=0", skiprows=2)
@@ -43,13 +58,8 @@ df = (
     .sort_values("publication date", ascending=True)
 )
 
-# Set up page and branding
-# st.logo("srn-icon.png", link="https://sustainabilityreportingnavigator.com")
-st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-icon.png")
-# st.title("SRN CSRD Report Archive")
-st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True) 
 
-
+# ------------------------------------ EXPLANATIONS -----------------------------
 col1c, col2c = st.columns((0.6, 0.4))
 with col1c:
     st.markdown(f"""
@@ -93,8 +103,10 @@ with col2c:
         unsafe_allow_html=True
     )
 
-
 st.divider()
+
+
+# ------------------------------------ FILTERS ----------------------------------
 # Create filters in two columns
 col1, col2 = st.columns(2)
 
@@ -138,8 +150,9 @@ selected_company = st.selectbox(
 if selected_company is not None:
     filtered_df = filtered_df[filtered_df["company"] == selected_company]
 
-# ----
 
+# ------------------------------------ LIST AND HEATMAP -----------------------
+# ------------------------------------ LIST
 
 try:
     tab1, tab2 = st.tabs(["List of reports", "Heatmap of topics reported"])
@@ -167,35 +180,51 @@ try:
             height=35 * len(filtered_df) + 38
         )
 
+# ------------------------------------ HEATMAP
     with tab2:
         # Create filters in two columns
-        col1d, _ = st.columns([0.7, 0.3])
+        col1d, col2d = st.columns([0.5, 0.5])
 
         with col1d:
-            st.markdown(":gray[For this chart, we counted the number of times, the standard-identifier (e.g., 'E1' for ESRS E1: Climate change) is referenced in the company's sustainability statement.]")
-            st.checkbox("Scale the references by the length of the sustainability statement", key="scale_by_pages")
+            st.markdown("""
+                        ##### Explanation \n\n
+                        This chart shows simple counts of how often a standard is referenced in the company's sustainability statement. To compute the count, we scan the pages of the sustainability statement and count the occurrences of the standard identifier (e.g., E1, E2, ..., G1).
+                        """)
+
+            st.markdown("###### Scaling\n\n")
+            st.checkbox(label="Scale the counts by the length of the sustainability statement (to control for longer reports)", key="scale_by_pages")
+            st.checkbox(label="Scale the counts by the number of datapoints per standard from IG-3 (to control for longer standards)", key="scale_by_dp")
             scale_by_pages = st.session_state.get("scale_by_pages", False)
+            scale_by_dp = st.session_state.get("scale_by_dp", False)
 
-        filtered_melted_df = (
-            filtered_df
-            .loc[:, ['company', "pages PDF", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]]
-            .melt(id_vars=["company", "pages PDF"], value_name="hits", var_name="standard")
-            .assign(
-                standard = lambda x: x["standard"].str.upper(),
-                hits=lambda x: x["hits"] / x["pages PDF"] if scale_by_pages else x["hits"]  # Scale if checked
+            st.markdown("###### Split view")
+            split_view = st.radio(label="", options=("by sector", "by country", "by auditor", "no split"), index=0, horizontal=True, label_visibility="collapsed")
+
+
+        with col2d:
+            filtered_melted_df = (
+                filtered_df
+                .loc[:, ['company', "sector", "country", "auditor", "pages PDF", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]]
+                .melt(id_vars=["company", "sector", "country", "auditor", "pages PDF"], value_name="hits", var_name="standard")
+                .merge(standard_info_mapper)
+                .assign(
+                    standard=lambda x: x['standard'].str.upper(),
+                    hits=lambda x: x["hits"] / x["pages PDF"] if scale_by_pages else x["hits"], 
+                    )
+                .assign(
+                    hits=lambda x: x["hits"] / x["ig3_dp"] if scale_by_dp else x["hits"],  
                 )
-            .dropna()
-        )
+                .sort_values("sector")
+                .dropna()
+            )
 
-        if filtered_melted_df.empty:
-            st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
+            # print(filtered_melted_df)
 
-        else:
-            # Add a radio button for scaling method
-            scaling_method = st.radio("Select scaling method (Within-firm: colors show variation within one firm; Overall: colors show comparison across all displayed firms)", ("Within-firm", "Overall"), index=0)
+            if filtered_melted_df.empty:
+                st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
 
-            if scaling_method == "Within-firm":
-                # Compute normalized hits per company (0 to 1 for each firm)
+            else:
+
                 filtered_melted_df["norm_hits"] = (
                     filtered_melted_df.groupby("company")["hits"]
                     .transform(lambda x: x / x.max() if x.max() != 0 else 0)
@@ -205,59 +234,88 @@ try:
                     domain=[0, 0.5, 1],
                     range=['#ffffff', '#a0a0ff', '#4200ff']
                 )
-            else:
-                # Use overall hits
-                color_field = "hits:Q"
-                overall_max = filtered_melted_df["hits"].max()
-                color_scale = alt.Scale(
-                    domain=[0, overall_max/2, overall_max],
-                    range=['#ffffff', '#a0a0ff', '#4200ff']
-                )
 
-            # Create the heatmap using the chosen scaling method
-            heatmap = (
-                alt.Chart(filtered_melted_df)
-                .mark_rect(stroke="lightgray", filled=True)
-                .encode(
-                    x=alt.X(
-                        "standard", 
-                        title=None, 
-                        axis=alt.Axis(orient="top"),
-                        sort=["esrs 1", "esrs 2", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1", "sbm-3", "iro-1"]
-                    ),
-                    y=alt.Y("company", title=None),
-                    color=alt.Color(
-                        color_field, 
-                        title="Referenced", 
-                        scale=color_scale
-                    ),
-                    tooltip=[
-                        alt.Tooltip("company", title="Company"),
-                        alt.Tooltip("standard", title="ESRS topic"),
-                        alt.Tooltip("hits", title="Referenced")
-                    ]
-                )
-            )
+                if split_view != "no split":
 
-                     
-            predicate = alt.datum.hits > filtered_melted_df['hits'].max()/2
+                    heatmap_faceted = (
+                        alt.Chart(filtered_melted_df)
+                        .mark_rect(stroke="lightgray", filled=True)
+                        .encode(
+                            x=alt.X(
+                                "standard",
+                                title=None,
+                                axis=alt.Axis(orient="top", labelAngle=0),
+                                sort=[
+                                    'E1', 'E2', 'E3', 'E4', 'E5',
+                                    'S1', 'S2', 'S3', 'S4',
+                                    'G1'
+                                ]
+                            ),
+                            y=alt.Y("company", title=None), 
+                            color=alt.Color(
+                                color_field,
+                                scale=color_scale,
+                                legend=None
+                            ),
+                            tooltip=[
+                                alt.Tooltip("company", title="Company"),
+                                alt.Tooltip("standard2", title="ESRS topic"),
+                                alt.Tooltip("hits", title="Referenced", format=".2f" if scale_by_pages or scale_by_dp else "d")
+                            ]
+                        )
+                        .properties(width = 400)
+                        .facet(
+                            row=alt.Row(
+                                "sector:N" if split_view == "by sector" else "country:N" if split_view == "by country" else "auditor:N", 
+                                header=alt.Header(
+                                    orient='top',
+                                    labelAngle=0,
+                                    title=""
+                                )
+                            )
+                        )
+                        # Make sure each facet has its own y-axis domain
+                        .resolve_scale(
+                            x="independent",
+                            y='independent',
+                            color="shared"
+                        )
+                    )
+                    
+                    st.altair_chart(heatmap_faceted)
 
-            # labels = (
-            #     alt.Chart(filtered_melted_df)
-            #     .mark_text(
-            #         fontSize=12,
-            #         fontWeight="lighter",
-            #     )
-            #     .encode(
-            #         x="standard:O",
-            #         y="company:O",
-            #         color=alt.when(predicate).then(alt.value("white")).otherwise(alt.value("gray")),
-            #         text=alt.Text("hits:Q", format=".1f" if scale_by_pages else ".0f"),
-            #         tooltip = alt.value(None),
-            #     )
-            # )
+                else:
 
-            st.altair_chart(heatmap)
+                    heatmap = (
+                        alt.Chart(filtered_melted_df)
+                        .mark_rect(stroke="lightgray", filled=True)
+                        .encode(
+                            x=alt.X(
+                                "standard",
+                                title=None,
+                                axis=alt.Axis(orient="top", labelAngle=0),
+                                sort=[
+                                    'E1', 'E2', 'E3', 'E4', 'E5',
+                                    'S1', 'S2', 'S3', 'S4',
+                                    'G1'
+                                ]
+                            ),
+                            y=alt.Y("company", title=None), 
+                            color=alt.Color(
+                                color_field,
+                                scale=color_scale,
+                                legend=None
+                            ),
+                            tooltip=[
+                                alt.Tooltip("company", title="Company"),
+                                alt.Tooltip("standard2", title="ESRS topic"),
+                                alt.Tooltip("hits", title="Referenced", format=".2f" if scale_by_pages or scale_by_dp else "d")
+                            ]
+                        )
+                        .properties(width = 400)
+                    )
+                    
+                    st.altair_chart(heatmap)
 
 
 
@@ -265,14 +323,8 @@ except Exception as e:
     st.error('This is an error. We are working on a fix. In the meantime, check out our Google Sheet!', icon="🚨")
     print(e)
 
-
-# st.divider()
-# col1a, col2a = st.columns(spec=(0.3, 0.7))
-# with col1a:
-#     st.image("logo.png", width=300)
-# with col2a:
-st.markdown("""
-            :gray[20250226-12:43am]
-            """)
+# st.markdown("""
+#             :gray[20250226-12:43am]
+#             """)
 
 
