@@ -4,9 +4,6 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
-from streamlit_modal import Modal
-from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
-
 
 # ------------------------------------ SETUP ------------------------------------
 
