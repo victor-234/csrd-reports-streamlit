@@ -328,7 +328,7 @@ try:
         
         sunhat_sectors = requests.get("https://sunhat-api.onrender.com/sustainability-reports/filters").json()["sectors"]
 
-        industry = st.selectbox("Select a sector below to query the reports.", sorted(sunhat_sectors))
+        industry = st.selectbox("Select a sector below to query these reports.", sorted(sunhat_sectors))
 
         if industry not in sunhat_sectors:
             st.error("It seems that this industry is not yet implemented, we are sorry!", icon="🚨")
