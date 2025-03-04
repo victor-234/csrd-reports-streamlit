@@ -1,6 +1,11 @@
+import requests
+
 import pandas as pd
 import streamlit as st
 import altair as alt
+
+from streamlit_modal import Modal
+from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode
 
 
 # ------------------------------------ SETUP ------------------------------------
@@ -37,7 +42,7 @@ df = (
         )
     .assign(
         link = lambda x: [f"{y}#name={z}" for y, z in zip(x["link"], x["company"])],
-        company = lambda x: x["company"].str.strip()
+        company = lambda x: x["company"].str.strip(),
         )
     .loc[:, ['company', 'link', 'country', 'sector', 'industry', "publication date", "pages PDF", "auditor"]]
     .dropna()
@@ -155,7 +160,7 @@ if selected_company is not None:
 # ------------------------------------ LIST
 
 try:
-    tab1, tab2 = st.tabs(["List of reports", "Heatmap of topics reported"])
+    tab1, tab2, tab3 = st.tabs(["List of reports", "Heatmap of topics reported", "Report search engine"])
 
     with tab1:
         # Display the filtered table with custom formatting and column configurations
@@ -177,7 +182,7 @@ try:
             },
             hide_index=True,
             use_container_width=True,
-            height=35 * len(filtered_df) + 38
+            height=35 * len(filtered_df) + 38,
         )
 
 # ------------------------------------ HEATMAP
@@ -198,7 +203,7 @@ try:
             scale_by_dp = st.session_state.get("scale_by_dp", False)
 
             st.markdown("###### Split view")
-            split_view = st.radio(label="", options=("by sector", "by country", "by auditor", "no split"), index=0, horizontal=True, label_visibility="collapsed")
+            split_view = st.radio(label="None", options=("by sector", "by country", "by auditor", "no split"), index=0, horizontal=True, label_visibility="collapsed")
 
 
         with col2d:
@@ -316,6 +321,51 @@ try:
                     )
                     
                     st.altair_chart(heatmap)
+
+# ------------------------------------ SEARCH ENGINE
+    with tab3:
+
+        st.markdown(f"""
+                    
+                    """)
+        
+        sunhat_sectors = requests.get("https://sunhat-api.onrender.com/sustainability-reports/filters").json()["sectors"]
+
+        industry = st.selectbox("Select a sector below to query the reports.", sorted(sunhat_sectors))
+
+        if industry not in sunhat_sectors:
+            st.error("It seems that this industry is not yet implemented, we are sorry!", icon="🚨")
+    
+        else:
+            prompt = st.chat_input("Ask a question")
+            if prompt:
+
+                headers = {"Content-Type": "application/json"}
+                data = {
+                    "query": prompt,
+                    "year": 2024,
+                    "sector": industry
+                }
+
+                with st.spinner("Querying the PDFs", show_time=True):
+                    st.write(data)
+                    
+                    response = requests.post("https://sunhat-api.onrender.com/sustainability-reports/query", json=data, headers=headers)
+                    response_filtered = sorted(response.json(), key=lambda x: x["score"], reverse=True)[:2]
+                
+                with st.container(border=True):
+                    for r in response_filtered:
+                        text = r["text"].replace("|", "").replace("-", "").replace(">", "")
+                        page_url = f"[Page {r['page']}]({r['link']})"
+                        st.markdown(f"{page_url}: {text}")
+
+
+
+
+
+
+
+
 
 
 
