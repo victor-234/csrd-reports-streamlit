@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
+from streamlit_pdf_viewer import pdf_viewer
 
 # ------------------------------------ SETUP ------------------------------------
 
@@ -17,6 +18,16 @@ standard_info_mapper = pd.DataFrame({
     'standardgroup': ['E', 'E', 'E', 'E', 'E', 'S', 'S', 'S', 'S', 'G'],
     'ig3_dp': [217, 72, 51, 125, 67, 198, 71, 69, 69, 55]
 })
+
+def download_pdf(url):
+    """Fetch the PDF from a URL and return it as bytes."""
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.content
+    except requests.exceptions.RequestException as e:
+        st.error(f"Failed to load PDF: {e}")
+        return None
 
 
 # ------------------------------------ PREPARE DF -------------------------------
@@ -322,44 +333,84 @@ try:
 # ------------------------------------ SEARCH ENGINE
     with tab3:
 
-        st.markdown(f"""
-                    
+        st.markdown(f"""                    
                     """)
         
-        sunhat_sectors = requests.get("https://sunhat-api.onrender.com/sustainability-reports/filters").json()["sectors"]
+        sunhat_filters = requests.get("https://sunhat-api.onrender.com/sustainability-reports/filters").json()
+        sunhat_sectors = sunhat_filters["sectors"]
+        sunhat_companies = sunhat_filters["names"]
 
-        industry = st.selectbox("Select a sector below to query these reports.", sorted(sunhat_sectors))
+        col1e, col2e = st.columns(2)
+        with col1e:
+            industry = st.selectbox("Select a sector below to query these reports.", sorted(sunhat_sectors), index=None)
+        with col2e:
+            company = st.selectbox("Select a company below to query its report.", sorted(sunhat_companies), index=None)
 
-        if industry not in sunhat_sectors:
-            st.error("It seems that this industry is not yet implemented, we are sorry!", icon="🚨")
-    
-        else:
-            prompt = st.chat_input("Ask a question")
-            if prompt:
+        prompt = st.chat_input("Ask a question")
+        
+        if prompt:
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "query": prompt,
+                "year": 2024,
+            }
 
-                headers = {"Content-Type": "application/json"}
-                data = {
-                    "query": prompt,
-                    "year": 2024,
-                    "sector": industry
-                }
+            if industry:
+                data["sector"] = industry
 
-                with st.spinner("Querying the PDFs", show_time=True):
-                    st.write(data)
-                    
-                    response = requests.post("https://sunhat-api.onrender.com/sustainability-reports/query", json=data, headers=headers)
-                    response_filtered = sorted(response.json(), key=lambda x: x["score"], reverse=True)[:2]
+            if company:
+                data["name"] = company
+
+            with st.spinner("Querying the PDFs", show_time=True):
+                # st.write(data)
+                response = requests.post(
+                    "https://sunhat-api.onrender.com/sustainability-reports/query", 
+                    json=data, 
+                    headers=headers
+                    )
                 
-                with st.container(border=True):
-                    for r in response_filtered:
-                        text = r["text"].replace("|", "").replace("-", "").replace(">", "")
-                        page_url = f"[Page {r['page']}]({r['link']})"
-                        st.markdown(f"{page_url}: {text}")
+            reports_queried = {}
+            for r in response.json():
+                if r["reportId"] not in reports_queried.keys():
+                    reports_queried[r["reportId"]] = [r]
+                else:
+                    reports_queried[r["reportId"]].append(r)
+            
 
+            for report, chunks in reports_queried.items():
+                report_metadata = requests.get(
+                    f"https://sunhat-api.onrender.com/sustainability-reports/reports/{report}"
+                    ).json()
+                    
+                with st.expander(report_metadata['company']['name']):
+                    col1f, col2f = st.columns([0.35, 0.65])
+                    relevant_chunks = sorted(chunks, key=lambda x: x["score"], reverse=True)[:3]
+                        
+                    with col1f:
+                        for chunk in relevant_chunks:
+                            text = chunk["text"].replace("|", "").replace("-", "").replace(">", "")
+                            page = f"**Page {chunk['page']+1}**"
+                            st.markdown(f"{page}: {text}")
 
-
-
-
+                        st.markdown(f"[Full report]({chunk['link']})")
+                    
+                    with col2f:
+                        annotations = [{
+                            "page": c["page"]+1,
+                            "x": c["x1"],
+                            "y": c["y1"],
+                            "height": c["y2"] - c["y1"],
+                            "width": c["x2"] - c["x1"],
+                            "color": "#4200ff"
+                            } for c in relevant_chunks]
+                        
+                        with st.spinner("Downloading the PDF", show_time=True):
+                            pdf_viewer(
+                                input=download_pdf(report_metadata["link"]),
+                                annotations=annotations,
+                                height=800,
+                                pages_to_render=[a["page"] for a in annotations],
+                            )
 
 
 
