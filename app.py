@@ -1,3 +1,4 @@
+import os
 import requests
 
 import pandas as pd
@@ -5,6 +6,12 @@ import streamlit as st
 import altair as alt
 
 from streamlit_pdf_viewer import pdf_viewer
+from openai import OpenAI
+# from dotenv import load_dotenv
+    
+# load_dotenv()
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+
 
 # ------------------------------------ SETUP ------------------------------------
 
@@ -340,11 +347,11 @@ try:
         sunhat_sectors = sunhat_filters["sectors"]
         sunhat_companies = sunhat_filters["names"]
 
-        col1e, col2e = st.columns(2)
-        with col1e:
-            industry = st.selectbox("Select a sector below to query these reports.", sorted(sunhat_sectors), index=None)
-        with col2e:
-            company = st.selectbox("Select a company below to query its report.", sorted(sunhat_companies), index=None)
+        # col1e, col2e = st.columns(2)
+        # with col1e:
+        industry = st.selectbox("Select a sector below to query these reports.", sorted(sunhat_sectors), index=None)
+        # with col2e:
+        #     company = st.selectbox("Select a company below to query its report.", sorted(sunhat_companies), index=None)
 
         prompt = st.chat_input("Ask a question")
         
@@ -358,8 +365,8 @@ try:
             if industry:
                 data["sector"] = industry
 
-            if company:
-                data["name"] = company
+            # if company:
+            #     data["name"] = company
 
             with st.spinner("Querying the PDFs", show_time=True):
                 # st.write(data)
@@ -370,29 +377,47 @@ try:
                     )
                 
             reports_queried = {}
+            # Aggregate responses by report
             for r in response.json():
                 if r["reportId"] not in reports_queried.keys():
                     reports_queried[r["reportId"]] = [r]
                 else:
                     reports_queried[r["reportId"]].append(r)
             
-
+            # Display the results per report
             for report, chunks in reports_queried.items():
                 report_metadata = requests.get(
                     f"https://sunhat-api.onrender.com/sustainability-reports/reports/{report}"
                     ).json()
                     
-                with st.expander(report_metadata['company']['name']):
+                with st.expander(report_metadata['company']['name'], expanded=True):
                     col1f, col2f = st.columns([0.35, 0.65])
-                    relevant_chunks = sorted(chunks, key=lambda x: x["score"], reverse=True)[:3]
+                    relevant_chunks = sorted(chunks, key=lambda x: x["score"], reverse=True) # use these for the annotations but feed all to GPT
                         
                     with col1f:
-                        for chunk in relevant_chunks:
-                            text = chunk["text"].replace("|", "").replace("-", "").replace(">", "")
-                            page = f"**Page {chunk['page']+1}**"
-                            st.markdown(f"{page}: {text}")
+                        relevant_texts = "\n".join([f"Page {c['page']+1}: {c['text']}" for c in relevant_chunks])
+                        # for chunk in relevant_chunks:
+                        #     text = chunk["text"].replace("|", "").replace("-", "").replace(">", "")
+                        #     page = f"**Page {chunk['page']+1}**"
+                        #     st.markdown(f"{page}: {text}")
+                        with st.chat_message("assistant"):
+                            stream = client.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[
+                                    {"role": "system", "content": "You are an expert in gathering information from sustainability reports."},
+                                    {"role": "user", "content": f"Answer diligently on this question {prompt} from the following chunks of the report:"},
+                                    {"role": "user", "content": relevant_texts},
+                                    {"role": "user", "content": f"Be concise and provide the most relevant information from the texts only. Do not use the internet or general knowledge."},
+                                ],
+                                stream=True
+                                )
+                            
+                            gpt_response = st.write_stream(stream)
 
-                        st.markdown(f"[Full report]({chunk['link']})")
+                            # for chunk in completion:
+                            #     print(chunk.choices[0].delta)
+
+                            st.markdown(f"[Full report]({report_metadata['link']})")
                     
                     with col2f:
                         annotations = [{
