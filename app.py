@@ -350,7 +350,7 @@ try:
         # with col2e:
         #     company = st.selectbox("Select a company below to query its report.", sorted(sunhat_companies), index=None)
 
-        prompt = st.chat_input("Ask a question", disabled=industry is None)
+        prompt = st.chat_input("Does the firm have a Paris-aligned decarbonization plan?", disabled=industry is None)
         
         if prompt:
             headers = {"Content-Type": "application/json"}
