@@ -437,7 +437,10 @@ try:
                                 pages_to_render=[a["page"] for a in annotations],
                             )
 
-
+        st.markdown('#')
+        st.markdown('#')
+        st.markdown("\n\n:gray[Powered by [Sunhat](http://getsunhat.com/)]")
+        # st.image("sunhat-logo_1722242619714.svg", width=100, output_format="PNG")
 
 
 
