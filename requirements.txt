@@ -3,3 +3,4 @@ pandas
 openpyxl
 altair
 streamlit-pdf-viewer
+openai
