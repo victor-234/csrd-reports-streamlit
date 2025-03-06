@@ -339,9 +339,6 @@ try:
 
 # ------------------------------------ SEARCH ENGINE
     with tab3:
-
-        st.markdown(f"""                    
-                    """)
         
         sunhat_filters = requests.get("https://sunhat-api.onrender.com/sustainability-reports/filters").json()
         sunhat_sectors = sunhat_filters["sectors"]
@@ -349,11 +346,11 @@ try:
 
         # col1e, col2e = st.columns(2)
         # with col1e:
-        industry = st.selectbox("Select a sector below to query these reports.", sorted(sunhat_sectors), index=None)
+        industry = st.selectbox("Select a sector below and ask the search engine about the reports of firms in this sector!", sorted(sunhat_sectors), index=None)
         # with col2e:
         #     company = st.selectbox("Select a company below to query its report.", sorted(sunhat_companies), index=None)
 
-        prompt = st.chat_input("Ask a question")
+        prompt = st.chat_input("Ask a question", disabled=industry is None)
         
         if prompt:
             headers = {"Content-Type": "application/json"}
