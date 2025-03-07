@@ -1,32 +1,35 @@
+import streamlit as st
 import os
 import requests
 
 import pandas as pd
-import streamlit as st
 import altair as alt
 
-from streamlit_pdf_viewer import pdf_viewer
 from openai import OpenAI
-# from dotenv import load_dotenv
 
 from helpers import read_data
 from helpers import define_standard_info_mapper
 from helpers import plot_ui
 from helpers import plot_heatmap
 from helpers import download_pdf
-    
-# load_dotenv()
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+from helpers import display_annotated_pdf
+from helpers import get_all_reports
+from helpers import query_single_report
+from helpers import define_popover_title
+from helpers import summarize_text_bygpt
 
 
 # ------------------------------------ SETUP ----------------------------------
 st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-icon.png")
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True)
 
 
 # ------------------------------------ DATA ----------------------------------
 df = read_data()
 standard_info_mapper = define_standard_info_mapper()
+sunhat_reports = get_all_reports()
+
 
 if "selected_companies" not in st.session_state:
     st.session_state.selected_companies = set()
@@ -86,8 +89,6 @@ if len(selected_companies) != 0:
 
 
 
-
-
 try:
     tab1, tab2 = st.tabs(["List of reports", "Heatmap of topics reported"])
 
@@ -95,12 +96,14 @@ try:
     with tab1:
 
         table = st.dataframe(
-            filtered_df.loc[:, ["link", "country", "sector", "industry", "publication date", "pages PDF", "auditor"]],
+            filtered_df.loc[:, ["company", "link", "country", "sector", "industry", "publication date", "pages PDF", "auditor"]],
             column_config={
+                "company": st.column_config.Column(width="medium", label="Company"),
                 "link": st.column_config.LinkColumn(
-                    label="Company",
-                    width="medium",
-                    display_text="^https://.*#name=(.*)$"
+                    label="Download",
+                    width="small",
+                    display_text="Link"
+                    # display_text="^https://.*#download=(.*)$"
                 ),
                 "country": st.column_config.Column(label="Country"),
                 "sector": st.column_config.Column(width="medium", label="Sector"),
@@ -122,93 +125,62 @@ try:
         )
 
         query_companies = table.selection.rows
-        query_companies_df = filtered_df.iloc[query_companies, :]["company"].tolist()
+        query_companies_names = filtered_df.iloc[query_companies, :]["company"].tolist()
 
 
     st.markdown("### Search Engine")
 
     with st.popover(
-        "Select companies from the table by selecting the box to the left of the name to start searching." if query_companies == [] else f"Search in the reports of {len(query_companies)} companies" if len(query_companies) > 1 else "Search in the report of one company",
-        disabled=query_companies == [], 
+        label=define_popover_title(query_companies_names),
+        disabled=query_companies == [] or len(query_companies) > 5, 
         use_container_width=True,
-        icon="🔍"
+        # icon="🔍"
         ):
         
-        prompt = st.chat_input("Do the firms have a Paris-aligned decarbonization plan?")
+        prompt = st.chat_input("Does the company have a Paris-aligned decarbonization plan?")
 
         if prompt:
-            data = {
-                "query": prompt,
-                "year": 2024,
-            }
-            
-            with st.spinner("Analyzing the PDFs", show_time=True):
-                response = requests.post(
-                    "https://sunhat-api.onrender.com/sustainability-reports/query", 
-                    headers={"Content-Type": "application/json"},
-                    json=data, 
-                    )
-                
-            reports_queried = {}
-            # Aggregate responses by report
-            for r in response.json():
-                if r["reportId"] not in reports_queried.keys():
-                    reports_queried[r["reportId"]] = [r]
-                else:
-                    reports_queried[r["reportId"]].append(r)
-            
-            # Display the results per report
-            for report, chunks in reports_queried.items():
-                report_metadata = requests.get(
-                    f"https://sunhat-api.onrender.com/sustainability-reports/reports/{report}"
-                    ).json()
-                    
-                with st.expander(report_metadata['company']['name'], expanded=True):
-                    col1f, col2f = st.columns([0.35, 0.65])
-                    relevant_chunks = sorted(chunks, key=lambda x: x["score"], reverse=True) # use these for the annotations but feed all to GPT
-                        
-                    with col1f:
-                        relevant_texts = "\n".join([f"Page {c['page']+1}: {c['text']}" for c in relevant_chunks])
-                        # for chunk in relevant_chunks:
-                        #     text = chunk["text"].replace("|", "").replace("-", "").replace(">", "")
-                        #     page = f"**Page {chunk['page']+1}**"
-                        #     st.markdown(f"{page}: {text}")
+            query_reports = sunhat_reports[sunhat_reports["companyName"].isin(query_companies_names)]
+
+            # For each report, query relevant chunks from PDF (Sunhat), summarize them (GPT-4o), and stream
+            for _, query_report in query_reports.iterrows():
+
+                query_results = query_single_report(query_report['id'], prompt)
+
+                with st.expander(query_report['companyName'], expanded=True):
+                    col_expander_response, col_expander_pdf = st.columns([0.35, 0.65])
+
+                    with col_expander_response:
+                        query_results_text = "\n".join([x["text"] for x in query_results])
+
+                        with st.chat_message("user"):
+                            st.text(prompt)
+
                         with st.chat_message("assistant"):
-                            stream = client.chat.completions.create(
-                                model="gpt-4o-mini",
-                                messages=[
-                                    {"role": "system", "content": "You are an expert in gathering information from sustainability reports."},
-                                    {"role": "user", "content": f"Answer diligently on this question {prompt} from the following chunks of the report:"},
-                                    {"role": "user", "content": relevant_texts},
-                                    {"role": "user", "content": f"Be concise and provide the most relevant information from the texts only. Do not use the internet or general knowledge."},
-                                ],
-                                stream=True
+                            stream = summarize_text_bygpt(
+                                client=client, 
+                                queryText=prompt, 
+                                relevantChunkTexts=query_results_text
                                 )
                             
                             gpt_response = st.write_stream(stream)
+                            st.markdown(f"[Access the full report here]({query_report['link']})")
 
-                            # for chunk in completion:
-                            #     print(chunk.choices[0].delta)
 
-                            st.markdown(f"[Full report]({report_metadata['link']})")
-                    
-                    with col2f:
-                        annotations = [{
+                    with col_expander_pdf:
+                        query_results_annotations = [{
                             "page": c["page"]+1,
                             "x": c["x1"],
                             "y": c["y1"],
                             "height": c["y2"] - c["y1"],
                             "width": c["x2"] - c["x1"],
                             "color": "#4200ff"
-                            } for c in relevant_chunks]
+                            } for c in query_results]
                         
-                        with st.spinner("Downloading the PDF", show_time=True):
-                            pdf_viewer(
-                                input=download_pdf(report_metadata["link"]),
-                                annotations=annotations,
-                                height=800,
-                                pages_to_render=[a["page"] for a in annotations],
-                            )
+                        with st.spinner("Downloading and annotating the PDF", show_time=True):
+                            display_annotated_pdf(query_report['link'], query_results_annotations)
+                            
+
 
         
 
