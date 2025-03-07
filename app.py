@@ -96,7 +96,11 @@ try:
     with tab1:
 
         table = st.dataframe(
-            filtered_df.loc[:, ["company", "link", "country", "sector", "industry", "publication date", "pages PDF", "auditor"]],
+            (
+                filtered_df
+                .assign(company = lambda x: [f"{y}*" if y in set(sunhat_reports["companyName"]) else y for y in x['company']])
+                .loc[:, ["company", "link", "country", "sector", "industry", "publication date", "pages PDF", "auditor"]]
+            ),
             column_config={
                 "company": st.column_config.Column(width="medium", label="Company"),
                 "link": st.column_config.LinkColumn(
@@ -129,6 +133,7 @@ try:
 
 
     st.markdown("### Search Engine")
+    st.caption(":gray[Currently, only reports marked with an asterisk (*) can be queried. Report search [powered by Sunhat](https://www.getsunhat.com).]")
 
     with st.popover(
         label=define_popover_title(query_companies_names),
@@ -147,38 +152,43 @@ try:
 
                 query_results = query_single_report(query_report['id'], prompt)
 
-                with st.expander(query_report['companyName'], expanded=True):
-                    col_expander_response, col_expander_pdf = st.columns([0.35, 0.65])
+                if query_results == []:
+                    st.error(f"Could not find any relevant information in the PDF for {query_report['companyName']}.")
 
-                    with col_expander_response:
-                        query_results_text = "\n".join([x["text"] for x in query_results])
+                else:
+                    with st.expander(query_report['companyName'], expanded=True):
+                        col_expander_response, col_expander_pdf = st.columns([0.35, 0.65])
 
-                        with st.chat_message("user"):
-                            st.text(prompt)
+                        with col_expander_response:
+                            query_results_text = "\n".join([x["text"] for x in query_results])
+                            print(query_results_text)
 
-                        with st.chat_message("assistant"):
-                            stream = summarize_text_bygpt(
-                                client=client, 
-                                queryText=prompt, 
-                                relevantChunkTexts=query_results_text
-                                )
+                            with st.chat_message("user"):
+                                st.text(prompt)
+
+                            with st.chat_message("assistant"):
+                                stream = summarize_text_bygpt(
+                                    client=client, 
+                                    queryText=prompt, 
+                                    relevantChunkTexts=query_results_text
+                                    )
+                                
+                                gpt_response = st.write_stream(stream)
+                                st.markdown(f"[Access the full report here]({query_report['link']})")
+
+
+                        with col_expander_pdf:
+                            query_results_annotations = [{
+                                "page": c["page"]+1,
+                                "x": c["x1"],
+                                "y": c["y1"],
+                                "height": c["y2"] - c["y1"],
+                                "width": c["x2"] - c["x1"],
+                                "color": "#4200ff"
+                                } for c in query_results]
                             
-                            gpt_response = st.write_stream(stream)
-                            st.markdown(f"[Access the full report here]({query_report['link']})")
-
-
-                    with col_expander_pdf:
-                        query_results_annotations = [{
-                            "page": c["page"]+1,
-                            "x": c["x1"],
-                            "y": c["y1"],
-                            "height": c["y2"] - c["y1"],
-                            "width": c["x2"] - c["x1"],
-                            "color": "#4200ff"
-                            } for c in query_results]
-                        
-                        with st.spinner("Downloading and annotating the PDF", show_time=True):
-                            display_annotated_pdf(query_report['link'], query_results_annotations)
+                            with st.spinner("Downloading and annotating the PDF", show_time=True):
+                                display_annotated_pdf(query_report['link'], query_results_annotations)
                             
 
 

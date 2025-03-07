@@ -106,7 +106,7 @@ def plot_ui(which: str, df: pd.DataFrame) -> None:
                 Want to make an addition? Feel free to do so [using this Google Sheet](https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/edit?gid=1695573594#gid=1695573594) and [follow us on LinkedIn](https://www.linkedin.com/company/sustainability-reporting-navigator/).
                 """)
 
-st.cache_data
+@st.cache_data
 def download_pdf(url):
     """Fetch the PDF from a URL and return it as bytes."""
     try:
@@ -254,7 +254,7 @@ def define_popover_title(query_companies_names) -> str:
     elif len(query_companies_names) == 1:
         return f"Search in the report of {query_companies_names[0]}"
     elif len(query_companies_names) > 1:
-        return f"Search in the reports of {len(query_companies_names)} companies"
+        return f"Search in the reports of {', '.join(query_companies_names[:-1])}, and {query_companies_names[-1]}"
 
 
 @st.cache_data
