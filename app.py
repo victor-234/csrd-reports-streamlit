@@ -76,7 +76,7 @@ filtered_df = df[
 with col3:
     selected_companies = st.multiselect(
         label="Filter by name",
-        options=[None] + sorted(df["company"].unique()),
+        options=[None] + sorted(df["company"].str.title().unique()),
         default=None,
         key="tab1_selectbox"
     )
