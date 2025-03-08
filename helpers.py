@@ -130,6 +130,7 @@ def plot_heatmap(filtered_melted_df, split_view):
         range=['#ffffff', '#a0a0ff', '#4200ff']
     )
 
+
     if split_view != "no split":
 
         heatmap_faceted = (
@@ -147,11 +148,11 @@ def plot_heatmap(filtered_melted_df, split_view):
                     ]
                 ),
                 y=alt.Y("company", title=None), 
-                color=alt.Color(
-                    color_field,
-                    scale=color_scale,
-                    legend=None
-                ),
+                color=alt.condition(
+                    alt.datum.norm_hits == 0,
+                    alt.value('#ffffc5'),
+                    alt.Color('norm_hits:Q', scale=color_scale, legend=None)
+                    ),
                 tooltip=[
                     alt.Tooltip("company", title="Company"),
                     alt.Tooltip("standard2", title="ESRS topic"),
@@ -195,11 +196,11 @@ def plot_heatmap(filtered_melted_df, split_view):
                     ]
                 ),
                 y=alt.Y("company", title=None), 
-                color=alt.Color(
-                    color_field,
-                    scale=color_scale,
-                    legend=None
-                ),
+                color=alt.condition(
+                    alt.datum.norm_hits == 0,
+                    alt.value('#ffffc5'),
+                    alt.Color('norm_hits:Q', scale=color_scale, legend=None)
+                    ),
                 tooltip=[
                     alt.Tooltip("company", title="Company"),
                     alt.Tooltip("standard2", title="ESRS topic"),

@@ -1,5 +1,4 @@
 import streamlit as st
-import os
 import requests
 
 import pandas as pd
@@ -11,7 +10,6 @@ from helpers import read_data
 from helpers import define_standard_info_mapper
 from helpers import plot_ui
 from helpers import plot_heatmap
-from helpers import download_pdf
 from helpers import display_annotated_pdf
 from helpers import get_all_reports
 from helpers import query_single_report
@@ -115,7 +113,7 @@ try:
                 "publication date": st.column_config.DateColumn(
                     format="DD.MM.YYYY", width="small", label="Published"
                 ),
-                "pages PDF": st.column_config.TextColumn(
+                "pages PDF": st.column_config.NumberColumn(
                     help="Number of pages of the sustainability statement.",
                     label="Pages"
                 ),
