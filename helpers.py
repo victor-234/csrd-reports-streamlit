@@ -101,7 +101,7 @@ def plot_ui(which: str, df: pd.DataFrame) -> None:
         return st.markdown(f"""
                 We are crowd-sourcing the collection of CSRD-compliant reports to support prepares and users of sustainability reporting.
 
-                Below, you find a continuously updated list of CSRD-compliant reports.
+                Below, you find a continuously updated list of CSRD-compliant reports for fiscal years starting on 01/01/2024.
                 
                 Want to make an addition? Feel free to do so [using this Google Sheet](https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/edit?gid=1695573594#gid=1695573594) and [follow us on LinkedIn](https://www.linkedin.com/company/sustainability-reporting-navigator/).
                 """)
