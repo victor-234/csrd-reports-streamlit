@@ -96,7 +96,7 @@ try:
         table = st.dataframe(
             (
                 filtered_df
-                .assign(company = lambda x: [f"{y}*" if y in set(sunhat_reports["companyName"]) else y for y in x['company']])
+                .assign(company = lambda x: [f"{y}*" if y not in set(sunhat_reports["companyName"]) else y for y in x['company']])
                 .loc[:, ["company", "link", "country", "sector", "industry", "publication date", "pages PDF", "auditor"]]
             ),
             column_config={
@@ -131,7 +131,7 @@ try:
 
 
     st.markdown("### Search Engine")
-    st.caption(":gray[Currently, only reports marked with an asterisk (*) can be queried. Report search [powered by Sunhat](https://www.getsunhat.com).]")
+    st.caption(":gray[Reports marked with an asterisk (*) cannot yet be queried. Report search [powered by Sunhat](https://www.getsunhat.com).]")
 
     with st.popover(
         label=define_popover_title(query_companies_names),
