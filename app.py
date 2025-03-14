@@ -98,6 +98,7 @@ with col2c:
                 {len(df)}
             </p>
             <p style="margin-top: 10px;">CSRD reports so far</p>
+            <a href="https://sustainabilityreportingnavigator.com/csrd-first100.pdf" target="_blank" style="color: #4200ff; font-size: 10pt">(Analysis of the first 100 reports)</a>
         </div>
         """,
         unsafe_allow_html=True
