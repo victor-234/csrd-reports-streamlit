@@ -1,10 +1,14 @@
 import streamlit as st
 import requests
+import gspread
 
 import pandas as pd
 import altair as alt
 
 from openai import OpenAI
+from google.oauth2.service_account import Credentials
+from datetime import datetime
+# from streamlit_geolocation import streamlit_geolocation
 
 from helpers import read_data
 from helpers import define_standard_info_mapper
@@ -15,12 +19,32 @@ from helpers import get_all_reports
 from helpers import query_single_report
 from helpers import define_popover_title
 from helpers import summarize_text_bygpt
+from helpers import get_remote_ip
 
 
 # ------------------------------------ SETUP ----------------------------------
 st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-icon.png")
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True)
+
+# Define the scope and authenticate with your service account credentials.
+scope = ['https://www.googleapis.com/auth/spreadsheets']
+creds = Credentials.from_service_account_file(
+    'csrd-reports-454301-63d2f65e3a80.json', 
+    scopes=scope
+)
+google_client = gspread.authorize(creds)
+
+# Open your Google Sheet by its ID (found in the URL of your sheet)
+sheet_id = '17pxk3WyL-6Fhyw2WATl_Czn9MVpNk-A-LoWxQzhxopU'
+log_spreadsheet = google_client.open_by_key(sheet_id)
+log_prompt = log_spreadsheet.worksheet("prompts")
+log_users = log_spreadsheet.worksheet("users")
+
+
+
+# .../?ref=linkedin_victor logs the referrer
+log_users.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), st.query_params.get("ref", ""), get_remote_ip()])
 
 
 # ------------------------------------ DATA ----------------------------------
@@ -113,7 +137,7 @@ with col3:
 
 # If the user selects a company, we filter; otherwise we keep all rows.
 if len(selected_companies) != 0:
-    filtered_df = filtered_df[filtered_df["company"].isin(selected_companies)]
+    filtered_df = filtered_df[filtered_df["company"].str.title().isin(selected_companies)]
 
 
 
@@ -126,7 +150,7 @@ try:
         table = st.dataframe(
             (
                 filtered_df
-                .assign(company = lambda x: [f"{y}*" if y not in set(sunhat_reports["companyName"]) else y for y in x['company']])
+                .assign(company = lambda x: [f"{name}*" if isin not in set(sunhat_reports["isin"]) else name for name, isin in zip(x['company'], x['isin'])])
                 .loc[:, ["company", "link", "country", "sector", "industry", "publication date", "pages PDF", "auditor"]]
             ),
             column_config={
@@ -160,30 +184,25 @@ try:
         query_companies_names = filtered_df.iloc[query_companies, :]["company"].tolist()
 
 
-    st.markdown("### Search Engine")
-    st.caption(":gray[Reports marked with an asterisk (*) cannot yet be queried. Report search [powered by Sunhat](https://www.getsunhat.com).]")
+    with st.container():
+        st.markdown("### Search Engine")
+        st.caption(":gray[Reports marked with an asterisk (*) cannot yet be queried. Report search [powered by Sunhat](https://www.getsunhat.com).]")
 
-    with st.popover(
-        label=define_popover_title(query_companies_names),
-        disabled=query_companies == [] or len(query_companies) > 5, 
-        use_container_width=True,
-        # icon="🔍"
-        ):
-        
-        prompt = st.chat_input("Does the company have a Paris-aligned decarbonization plan?")
+        prompt = st.chat_input(define_popover_title(query_companies_names), disabled=query_companies == [] or len(query_companies) > 5)
 
         if prompt:
+            log_prompt.append_row([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), prompt, ", ".join(query_companies_names)])
             query_reports = sunhat_reports[sunhat_reports["companyName"].isin(query_companies_names)]
 
             # For each report, query relevant chunks from PDF (Sunhat), summarize them (GPT-4o), and stream
             for _, query_report in query_reports.iterrows():
-
-                query_results = query_single_report(query_report['id'], prompt)
-
-                if query_results == []:
+                query_response = query_single_report(query_report['id'], prompt).json()
+            
+                if query_response.get("data", []) == []:
                     st.error(f"Could not find any relevant information in the PDF for {query_report['companyName']}.")
 
                 else:
+                    query_results = query_response["data"]
                     with st.expander(query_report['companyName'], expanded=True):
                         col_expander_response, col_expander_pdf = st.columns([0.35, 0.65])
 
