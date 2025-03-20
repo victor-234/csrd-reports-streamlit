@@ -1,76 +1,44 @@
-import pandas as pd
 import streamlit as st
+import requests
+
+import pandas as pd
 import altair as alt
 
+from openai import OpenAI
 
-# ------------------------------------ SETUP ------------------------------------
+from helpers import read_data
+from helpers import define_standard_info_mapper
+from helpers import plot_ui
+from helpers import plot_heatmap
+from helpers import display_annotated_pdf
+from helpers import get_all_reports
+from helpers import query_single_report
+from helpers import define_popover_title
+from helpers import summarize_text_bygpt
 
-# Set up page and branding
+
+# ------------------------------------ SETUP ----------------------------------
 st.set_page_config(layout="wide", page_title="SRN CSRD Archive", page_icon="srn-icon.png")
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 st.markdown("""<style> footer {visibility: hidden;} </style> """, unsafe_allow_html=True)
 
-standard_info_mapper = pd.DataFrame({
-    'standard': ['e1', 'e2', 'e3', 'e4', 'e5', 's1', 's2', 's3', 's4', 'g1'],
-    'standard2': ['E1 Climate', 'E2 Pollution', 'E3 Water', 'E4 Biodiv', 'E5 Circular', 'S1 Workforce', 'S2 Value chain', 'S3 Communities', 'S4 Consumers', 'G1 Conduct'],
-    'standardgroup': ['E', 'E', 'E', 'E', 'E', 'S', 'S', 'S', 'S', 'G'],
-    'ig3_dp': [217, 72, 51, 125, 67, 198, 71, 69, 69, 55]
-})
+
+# ------------------------------------ DATA ----------------------------------
+df = read_data()
+standard_info_mapper = define_standard_info_mapper()
+sunhat_reports = get_all_reports()
 
 
-# ------------------------------------ PREPARE DF -------------------------------
-# Prepare the CSRD DataFrame
-df = (
-    pd.read_csv("https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=0", skiprows=2)
-    .query("verified == 'yes'")
-    .rename(columns={
-        'SASB industry \n(SICS® Industries)': "industry",
-        })
-    .merge(
-        # Merge Industry-Sector Lookup from separate sheet
-        pd.read_csv(
-            "https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/export?format=csv&gid=218767986#gid=218767986"
-            ).rename(columns={
-                "SICS® Industries": "industry",
-                "SICS® Sector": "sector"
-                }
-            ), on="industry", how="left"
-        )
-    .assign(
-        link = lambda x: [f"{y}#name={z}" for y, z in zip(x["link"], x["company"])],
-        company = lambda x: x["company"].str.strip()
-        )
-    .loc[:, ['company', 'link', 'country', 'sector', 'industry', "publication date", "pages PDF", "auditor"]]
-    .dropna()
-    # Merge the standard-counts dataframe
-    .merge(
-        (
-            pd.read_csv("https://docs.google.com/spreadsheets/d/1Vj8yau93kmSs_WqnV5w1V_tdU-JlMo-BV6htDvAv1TI/export?format=csv&gid=1792638779#gid=1792638779")
-            .assign(
-                company = lambda x: x["company"].str.strip()
-                )
-            .query("year == 2024")
-            .drop("pages", axis=1)
-            .drop_duplicates(subset=['company'])
-        ),
-        on=["company"], how="outer", indicator=True
-    )
-    .query("_merge != 'right_only'")
-    .sort_values("publication date", ascending=True)
-)
+if "selected_companies" not in st.session_state:
+    st.session_state.selected_companies = set()
 
 
-# ------------------------------------ EXPLANATIONS -----------------------------
-col1c, col2c = st.columns((0.6, 0.4))
-with col1c:
-    st.markdown(f"""
-                We are crowd-sourcing the collection of CSRD-compliant reports to support prepares and users of sustainability reporting.
+# ------------------------------------ WELCOME ----------------------------------
+left_main_col, right_main_col = st.columns((0.6, 0.4))
+with left_main_col:
+    plot_ui("welcome-text", df=df)
 
-                Below, you find a continuously updated list of {len(df)} CSRD-compliant reports.
-                
-                Want to make an addition? Feel free to do so [using this Google Sheet](https://docs.google.com/spreadsheets/d/1Nlyf8Yz_9Fst8rEmQc2IMc-DWLF1fpmBTB7n4FlZwxs/edit?gid=1695573594#gid=1695573594) and [follow us on LinkedIn](https://www.linkedin.com/company/sustainability-reporting-navigator/).
-                """)
-
-with col2c:
+with right_main_col:
     # Custom CSS for Bubble Counter
     st.markdown(
         f"""
@@ -108,16 +76,16 @@ st.divider()
 
 
 # ------------------------------------ FILTERS ----------------------------------
-# Create filters in two columns
-col1, col2 = st.columns(2)
+st.markdown("### Filters")
 
+col1, col2, col3 = st.columns(3)
 with col1:
     country_options = ["All"] + sorted(df["country"].unique())
-    selected_countries = st.multiselect("Select countries", options=country_options, default=["All"], key="tab1_country")
+    selected_countries = st.multiselect("Filter by country", options=country_options, default=["All"], key="tab1_country")
 
 with col2:
     industry_options = ["All"] + sorted(df["sector"].unique())
-    selected_industries = st.multiselect("Select sector", options=industry_options, default=["All"], key="tab1_industry")
+    selected_industries = st.multiselect("Filter by sector", options=industry_options, default=["All"], key="tab1_industry")
 
 # Apply filtering logic
 if "All" in selected_countries:
@@ -135,197 +103,170 @@ filtered_df = df[
     df["sector"].isin(filtered_industries)
 ]
 
-# Next, we prepare a list of companies from this filtered DataFrame:
-company_list = sorted(filtered_df["company"].unique())
-
-# We add a 'None' item to represent "no company selected yet".
-selected_company = st.selectbox(
-    label="Search for a company",
-    options=[None] + company_list,            # None is the first option
-    format_func=lambda x: "Search for a company..." if x is None else x,  # Display text
-    index=0,                                   # Default to None selected
-    key="tab1_selectbox"
-)
+with col3:
+    selected_companies = st.multiselect(
+        label="Filter by name",
+        options=[None] + sorted(df["company"].str.title().unique()),
+        default=None,
+        key="tab1_selectbox"
+    )
 
 # If the user selects a company, we filter; otherwise we keep all rows.
-if selected_company is not None:
-    filtered_df = filtered_df[filtered_df["company"] == selected_company]
+if len(selected_companies) != 0:
+    filtered_df = filtered_df[filtered_df["company"].isin(selected_companies)]
 
 
-# ------------------------------------ LIST AND HEATMAP -----------------------
-# ------------------------------------ LIST
 
 try:
     tab1, tab2 = st.tabs(["List of reports", "Heatmap of topics reported"])
 
+    # ------------------------------------ TABLE ----------------------------------
     with tab1:
-        # Display the filtered table with custom formatting and column configurations
-        st.dataframe(
-            filtered_df.loc[:, ['link', 'country', 'sector', 'industry', 'publication date', 'pages PDF', 'auditor']],
+
+        table = st.dataframe(
+            (
+                filtered_df
+                .assign(company = lambda x: [f"{y}*" if y not in set(sunhat_reports["companyName"]) else y for y in x['company']])
+                .loc[:, ["company", "link", "country", "sector", "industry", "publication date", "pages PDF", "auditor"]]
+            ),
             column_config={
-                # "company": st.column_config.Column(width="medium", label="Company"),
+                "company": st.column_config.Column(width="medium", label="Company"),
                 "link": st.column_config.LinkColumn(
-                    label="Company",
-                    width="medium", 
-                    display_text="^https://.*#name=(.*)$"
-                    ),
+                    label="Download",
+                    width="small",
+                    display_text="Link"
+                    # display_text="^https://.*#download=(.*)$"
+                ),
                 "country": st.column_config.Column(label="Country"),
                 "sector": st.column_config.Column(width="medium", label="Sector"),
                 "industry": st.column_config.Column(width="medium", label="Industry"),
-                "publication date": st.column_config.DateColumn(format="DD.MM.YYYY", width="small", label="Published"),
-                "pages PDF": st.column_config.TextColumn(help="The number of pages of the sustainability statement.", label="Pages"),
+                "publication date": st.column_config.DateColumn(
+                    format="DD.MM.YYYY", width="small", label="Published"
+                ),
+                "pages PDF": st.column_config.NumberColumn(
+                    help="Number of pages of the sustainability statement.",
+                    label="Pages"
+                ),
                 "auditor": st.column_config.TextColumn(label="Auditor"),
             },
-            hide_index=True,
             use_container_width=True,
-            height=35 * len(filtered_df) + 38
+            hide_index=True,
+            on_select="rerun",
+            selection_mode="multi-row",
+            # height=35 * len(filtered_df) + 38,
         )
 
-# ------------------------------------ HEATMAP
-    with tab2:
-        # Create filters in two columns
-        col1d, col2d = st.columns([0.5, 0.5])
+        query_companies = table.selection.rows
+        query_companies_names = filtered_df.iloc[query_companies, :]["company"].tolist()
 
-        with col1d:
-            st.markdown("""
-                        ##### Explanation \n\n
-                        This chart shows simple counts of how often a standard is referenced in the company's sustainability statement. To compute the count, we scan the pages of the sustainability statement and count the occurrences of the standard identifier (e.g., E1, E2, ..., G1).
-                        """)
+
+    st.markdown("### Search Engine")
+    st.caption(":gray[Reports marked with an asterisk (*) cannot yet be queried. Report search [powered by Sunhat](https://www.getsunhat.com).]")
+
+    with st.popover(
+        label=define_popover_title(query_companies_names),
+        disabled=query_companies == [] or len(query_companies) > 5, 
+        use_container_width=True,
+        # icon="🔍"
+        ):
+        
+        prompt = st.chat_input("Does the company have a Paris-aligned decarbonization plan?")
+
+        if prompt:
+            query_reports = sunhat_reports[sunhat_reports["companyName"].isin(query_companies_names)]
+
+            # For each report, query relevant chunks from PDF (Sunhat), summarize them (GPT-4o), and stream
+            for _, query_report in query_reports.iterrows():
+
+                query_results = query_single_report(query_report['id'], prompt)
+
+                if query_results == []:
+                    st.error(f"Could not find any relevant information in the PDF for {query_report['companyName']}.")
+
+                else:
+                    with st.expander(query_report['companyName'], expanded=True):
+                        col_expander_response, col_expander_pdf = st.columns([0.35, 0.65])
+
+                        with col_expander_response:
+                            query_results_text = "\n".join([x["text"] for x in query_results])
+                            print(query_results_text)
+
+                            with st.chat_message("user"):
+                                st.text(prompt)
+
+                            with st.chat_message("assistant"):
+                                stream = summarize_text_bygpt(
+                                    client=client, 
+                                    queryText=prompt, 
+                                    relevantChunkTexts=query_results_text
+                                    )
+                                
+                                gpt_response = st.write_stream(stream)
+                                st.markdown(f"[Access the full report here]({query_report['link']})")
+
+
+                        with col_expander_pdf:
+                            query_results_annotations = [{
+                                "page": c["page"]+1,
+                                "x": c["x1"],
+                                "y": c["y1"],
+                                "height": c["y2"] - c["y1"],
+                                "width": c["x2"] - c["x1"],
+                                "color": "#4200ff"
+                                } for c in query_results]
+                            
+                            with st.spinner("Downloading and annotating the PDF", show_time=True):
+                                display_annotated_pdf(query_report['link'], query_results_annotations)
+                            
+
+
+        
+
+
+
+    # ------------------------------------ HEATMAP ----------------------------------
+    with tab2:
+        col_tab2_left, col_tab2_right = st.columns([0.5, 0.5])
+
+        with col_tab2_left:
+            st.markdown("""##### Explanation \n\n This chart shows simple counts of how often a standard is referenced in the company's sustainability statement. To compute the count, we scan the pages of the sustainability statement and count the occurrences of the standard identifier (e.g., E1, E2, ..., G1).""")
 
             st.markdown("###### Scaling\n\n")
-            st.checkbox(label="Scale the counts by the length of the sustainability statement (to control for longer reports)", key="scale_by_pages")
             st.checkbox(label="Scale the counts by the number of datapoints per standard from IG-3 (to control for longer standards)", key="scale_by_dp")
-            scale_by_pages = st.session_state.get("scale_by_pages", False)
             scale_by_dp = st.session_state.get("scale_by_dp", False)
 
             st.markdown("###### Split view")
-            split_view = st.radio(label="", options=("by sector", "by country", "by auditor", "no split"), index=0, horizontal=True, label_visibility="collapsed")
+            split_view = st.radio(label="None", options=("by sector", "by country", "by auditor", "no split"), index=0, horizontal=True, label_visibility="collapsed")
 
 
-        with col2d:
+        with col_tab2_right:
             filtered_melted_df = (
                 filtered_df
-                .loc[:, ['company', "sector", "country", "auditor", "pages PDF", 'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"]]
+                .loc[:, [
+                    'company', "sector", "country", "auditor", "pages PDF", 
+                    'e1', 'e2', "e3", "e4", "e5", "s1", "s2", "s3", "s4", "g1"
+                    ]
+                ]
                 .melt(id_vars=["company", "sector", "country", "auditor", "pages PDF"], value_name="hits", var_name="standard")
                 .merge(standard_info_mapper)
                 .assign(
                     standard=lambda x: x['standard'].str.upper(),
-                    hits=lambda x: x["hits"] / x["pages PDF"] if scale_by_pages else x["hits"], 
-                    )
-                .assign(
                     hits=lambda x: x["hits"] / x["ig3_dp"] if scale_by_dp else x["hits"],  
-                )
+                    )
                 .sort_values("sector")
                 .dropna()
             )
-
-            # print(filtered_melted_df)
 
             if filtered_melted_df.empty:
                 st.error(f"We have not analyzed this company yet but will do so very soon!", icon="🚨")
 
             else:
-
-                filtered_melted_df["norm_hits"] = (
-                    filtered_melted_df.groupby("company")["hits"]
-                    .transform(lambda x: x / x.max() if x.max() != 0 else 0)
-                )
-                color_field = "norm_hits:Q"
-                color_scale = alt.Scale(
-                    domain=[0, 0.5, 1],
-                    range=['#ffffff', '#a0a0ff', '#4200ff']
-                )
-
-                if split_view != "no split":
-
-                    heatmap_faceted = (
-                        alt.Chart(filtered_melted_df)
-                        .mark_rect(stroke="lightgray", filled=True)
-                        .encode(
-                            x=alt.X(
-                                "standard",
-                                title=None,
-                                axis=alt.Axis(orient="top", labelAngle=0),
-                                sort=[
-                                    'E1', 'E2', 'E3', 'E4', 'E5',
-                                    'S1', 'S2', 'S3', 'S4',
-                                    'G1'
-                                ]
-                            ),
-                            y=alt.Y("company", title=None), 
-                            color=alt.Color(
-                                color_field,
-                                scale=color_scale,
-                                legend=None
-                            ),
-                            tooltip=[
-                                alt.Tooltip("company", title="Company"),
-                                alt.Tooltip("standard2", title="ESRS topic"),
-                                alt.Tooltip("hits", title="Referenced", format=".2f" if scale_by_pages or scale_by_dp else "d")
-                            ]
-                        )
-                        .properties(width = 400)
-                        .facet(
-                            row=alt.Row(
-                                "sector:N" if split_view == "by sector" else "country:N" if split_view == "by country" else "auditor:N", 
-                                header=alt.Header(
-                                    orient='top',
-                                    labelAngle=0,
-                                    title=""
-                                )
-                            )
-                        )
-                        # Make sure each facet has its own y-axis domain
-                        .resolve_scale(
-                            x="independent",
-                            y='independent',
-                            color="shared"
-                        )
-                    )
-                    
-                    st.altair_chart(heatmap_faceted)
-
-                else:
-
-                    heatmap = (
-                        alt.Chart(filtered_melted_df)
-                        .mark_rect(stroke="lightgray", filled=True)
-                        .encode(
-                            x=alt.X(
-                                "standard",
-                                title=None,
-                                axis=alt.Axis(orient="top", labelAngle=0),
-                                sort=[
-                                    'E1', 'E2', 'E3', 'E4', 'E5',
-                                    'S1', 'S2', 'S3', 'S4',
-                                    'G1'
-                                ]
-                            ),
-                            y=alt.Y("company", title=None), 
-                            color=alt.Color(
-                                color_field,
-                                scale=color_scale,
-                                legend=None
-                            ),
-                            tooltip=[
-                                alt.Tooltip("company", title="Company"),
-                                alt.Tooltip("standard2", title="ESRS topic"),
-                                alt.Tooltip("hits", title="Referenced", format=".2f" if scale_by_pages or scale_by_dp else "d")
-                            ]
-                        )
-                        .properties(width = 400)
-                    )
-                    
-                    st.altair_chart(heatmap)
+                plot_heatmap(filtered_melted_df, split_view)
 
 
 
+
+# ------------------------------------ ERROR HANDLING ----------------------------------
 except Exception as e:
     st.error('This is an error. We are working on a fix. In the meantime, check out our Google Sheet!', icon="🚨")
     print(e)
-
-# st.markdown("""
-#             :gray[20250226-12:43am]
-#             """)
-
-
