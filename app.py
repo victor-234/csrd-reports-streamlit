@@ -40,7 +40,37 @@ with left_main_col:
 
 with right_main_col:
     # Custom CSS for Bubble Counter
-    plot_ui("bubble-counter", df=df)
+    st.markdown(
+        f"""
+        <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        ">
+            <p style="
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: 100px;
+                height: 100px;
+                background-color: #4200ff;
+                color: white;
+                font-size: 36px;
+                font-weight: bold;
+                border-radius: 50%;
+                text-align: center;
+                box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+                margin: 0;
+            ">
+                {len(df)}
+            </p>
+            <p style="margin-top: 10px;">CSRD reports so far</p>
+            <a href="https://sustainabilityreportingnavigator.com/csrd-first100.pdf" target="_blank" style="color: #4200ff; font-size: 10pt">(Analysis of the first 100 reports)</a>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 st.divider()
 
