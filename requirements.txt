@@ -4,3 +4,5 @@ openpyxl
 altair
 streamlit-pdf-viewer
 openai
+gspread
+google

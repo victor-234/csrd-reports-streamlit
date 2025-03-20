@@ -6,6 +6,9 @@ import requests
 
 from streamlit_pdf_viewer import pdf_viewer
 
+from streamlit import runtime
+from streamlit.runtime.scriptrunner import get_script_run_ctx
+
 
 def read_data() -> pd.DataFrame:
     """
@@ -33,20 +36,20 @@ def read_data() -> pd.DataFrame:
             # link = lambda x: [f"{y}#download=⬇️" for y, z in zip(x["link"], x["company"])],
             company = lambda x: x["company"].str.strip(),
             )
-        .loc[:, ['company', 'link', 'country', 'sector', 'industry', "publication date", "pages PDF", "auditor"]]
+        .loc[:, ['company', "isin", 'link', 'country', 'sector', 'industry', "publication date", "pages PDF", "auditor"]]
         .dropna()
         # Merge the standard-counts dataframe
         .merge(
             (
                 pd.read_csv("https://docs.google.com/spreadsheets/d/1Vj8yau93kmSs_WqnV5w1V_tdU-JlMo-BV6htDvAv1TI/export?format=csv&gid=1792638779#gid=1792638779")
                 .assign(
-                    company = lambda x: x["company"].str.strip()
+                    isin = lambda x: x["isin"].str.strip(),
                     )
                 .query("year == 2024")
-                .drop("pages", axis=1)
-                .drop_duplicates(subset=['company'])
+                .drop_duplicates(subset=['isin'])
+                .drop(["company", "pages"], axis=1)
             ),
-            on=["company"], how="outer", indicator=True
+            on=["isin"], how="outer", indicator=True
         )
         .query("_merge != 'right_only'")
         .sort_values("publication date", ascending=True)
@@ -213,7 +216,6 @@ def plot_heatmap(filtered_melted_df, split_view):
         
         return st.altair_chart(heatmap)
 
-
 @st.cache_data
 def get_all_reports() -> pd.DataFrame:
     """ Get all available reports from the Sunhat API """
@@ -241,16 +243,17 @@ def get_all_reports() -> pd.DataFrame:
     return (
         pd.DataFrame(all_reports)
         .assign(
-            companyName=lambda x: x["company"].apply(lambda y: y["name"])
+            companyName=lambda x: x["company"].apply(lambda y: y["name"]),
+            isin=lambda x: x["company"].apply(lambda y: y["isin"])
             )
-        .loc[:, ['id', 'companyName', 'link']]
+        .loc[:, ['id', 'companyName', 'isin', 'link']]
         )
 
 
 def define_popover_title(query_companies_names) -> str:
     """ Define the title for the popover """
     if len(query_companies_names) == 0:
-        return "Select companies from the table by selecting the box to the left of the name to start searching"
+        return "Select companies from the table by selecting the box to the left of the name"
     elif len(query_companies_names) > 5:
         return f"You can only select a maximum of five companies ({len(query_companies_names)} selected)"
     elif len(query_companies_names) == 1:
@@ -259,26 +262,23 @@ def define_popover_title(query_companies_names) -> str:
         return f"Search in the reports of {', '.join(query_companies_names[:-1])}, and {query_companies_names[-1]}"
 
 
-@st.cache_data
-def query_single_report(reportId, queryText, numberOfReturnedChunks=5):
+def query_single_report(reportId, prompt, numberOfReturnedChunks=5):
     """ Query a single report using the Sunhat API
     Args:
         reportId: str, the UUID report id
-        queryText: str, the text query to be executed
+        prompt: str, the text query to be executed
         numberOfReturnedChunks: int, the number of chunks to be returned
-            @ToDo: Implement pagination for returned chunks 
+            @ToDo: Implement pagination for returned chunks (but don't really need it)
     """
-    response = requests.post(
+    return requests.post(
         "https://sunhat-api.onrender.com/sustainability-reports/query",
         headers={"Content-Type": "application/json"},
         json={ 
             "reportId": reportId,
-            "query": queryText, 
+            "query": prompt, 
             "pageSize": numberOfReturnedChunks, 
             }
-    ).json()
-
-    return response.get("data")
+    )
 
 
 def summarize_text_bygpt(client, queryText, relevantChunkTexts):
@@ -302,3 +302,20 @@ def display_annotated_pdf(query_report_link, query_results_annotations):
         height=800,
         pages_to_render=[a["page"] for a in query_results_annotations],
         )
+
+
+def get_remote_ip() -> str:
+    """Get remote ip."""
+
+    try:
+        ctx = get_script_run_ctx()
+        if ctx is None:
+            return None
+
+        session_info = runtime.get_instance().get_client(ctx.session_id)
+        if session_info is None:
+            return None
+    except Exception as e:
+        return None
+
+    return session_info.request.remote_ip
